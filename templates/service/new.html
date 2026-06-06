@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+
+{% block title %}新增施作記錄 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+{#
+  4 步施作表單
+  步驟 ① 代理產品下拉（愛啪啪）
+  步驟 ② 消費者下拉 + 即時新增欄位
+  步驟 ③ 會員 / 非會員 radio
+  步驟 ④ 張數、實收金額（可改折扣）、耗材明細（可多列消耗品，各填數量、各自可標贈品）
+#}
+
+<div class="mb-4">
+    <h2 class="h4 fw-bold mb-1">新增施作記錄</h2>
+    <p class="text-muted small">依序填寫 4 個步驟，完成後按「提交」。</p>
+</div>
+
+<!-- 步驟指示器 -->
+<div class="d-flex align-items-center gap-2 mb-5 overflow-auto pb-1">
+    {% for step_num, step_label in [(1,'選產品'), (2,'選消費者'), (3,'身份'), (4,'明細')] %}
+    <div class="d-flex align-items-center gap-2">
+        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold small"
+             style="width:28px; height:28px; background:#1d1d1f; color:#fff; flex-shrink:0;">
+            {{ step_num }}
+        </div>
+        <span class="small text-muted text-nowrap">{{ step_label }}</span>
+    </div>
+    {% if not loop.last %}
+    <div class="flex-grow-1 border-top" style="min-width:20px;"></div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<form method="POST" action="/service/new" id="serviceForm">
+
+    <!-- ══════════════════════════════════════
+         步驟 ① — 代理產品
+    ══════════════════════════════════════ -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">
+                <span class="badge bg-dark me-2">1</span>選擇代理產品
+            </h5>
+
+            <div class="mb-0">
+                <label for="product_id" class="form-label small fw-semibold">代理產品</label>
+                <select class="form-select" id="product_id" name="product_id" required>
+                    <option value="" disabled selected>請選擇</option>
+                    {% for product in products %}
+                    <option value="{{ product.id }}"
+                            data-nonmember-price="{{ product.params.nonmember_base_price if product.params else 3980 }}"
+                            data-member-price="{{ product.params.member_base_price if product.params else 3100 }}"
+                            {% if request.form.product_id == product.id | string %}selected{% endif %}>
+                        {{ product.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         步驟 ② — 消費者
+    ══════════════════════════════════════ -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">
+                <span class="badge bg-dark me-2">2</span>選擇消費者
+            </h5>
+
+            <!-- 既有消費者下拉 -->
+            <div class="mb-3">
+                <label for="customer_id" class="form-label small fw-semibold">既有消費者</label>
+                <select class="form-select" id="customer_id" name="customer_id">
+                    <option value="">— 選擇既有消費者 —</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}"
+                            {% if request.form.customer_id == customer.id | string %}selected{% endif %}>
+                        {{ customer.name }}
+                        {% if customer.phone %} ({{ customer.phone }}){% endif %}
+                        {% if customer.is_member %} ★會員{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="form-text">若消費者不在列表中，請展開下方「新增消費者」</div>
+            </div>
+
+            <!-- 即時新增消費者（可展開） -->
+            <div>
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        id="toggleNewCustomer">
+                    <i class="bi bi-person-plus me-1"></i>新增消費者
+                </button>
+
+                <div id="newCustomerFields" class="mt-3 p-3 rounded-3" style="background:#f5f5f7; display:none;">
+                    <p class="small fw-semibold mb-2 text-muted">填寫後會自動建立消費者，並套用到本筆記錄</p>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label for="new_name" class="form-label small">姓名 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm"
+                                   id="new_name" name="new_name"
+                                   placeholder="消費者姓名"
+                                   value="{{ request.form.new_name or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="new_phone" class="form-label small">電話</label>
+                            <input type="tel" class="form-control form-control-sm"
+                                   id="new_phone" name="new_phone"
+                                   placeholder="0912-345-678"
+                                   value="{{ request.form.new_phone or '' }}">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="new_is_member" name="new_is_member" value="1"
+                                       {% if request.form.get('new_is_member') %}checked{% endif %}>
+                                <label class="form-check-label small" for="new_is_member">
+                                    設為會員（自帶券，不扣店家庫存）
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         步驟 ③ — 會員 / 非會員
+    ══════════════════════════════════════ -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">
+                <span class="badge bg-dark me-2">3</span>消費者身份
+            </h5>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-check form-check-card p-3 rounded-3 border"
+                         id="card-nonmember"
+                         style="cursor:pointer; transition: border-color .15s;">
+                        <input class="form-check-input" type="radio"
+                               name="member_type" id="member_nonmember"
+                               value="nonmember"
+                               {% if request.form.get('member_type', 'nonmember') == 'nonmember' %}checked{% endif %}
+                               required>
+                        <label class="form-check-label ms-2" for="member_nonmember" style="cursor:pointer;">
+                            <span class="fw-semibold">非會員</span><br>
+                            <span class="text-muted small">跟店家購買美容券，扣店家庫存</span><br>
+                            <span class="text-muted small">基準售價 NT$ 3,980 / 張</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-check-card p-3 rounded-3 border"
+                         id="card-member"
+                         style="cursor:pointer; transition: border-color .15s;">
+                        <input class="form-check-input" type="radio"
+                               name="member_type" id="member_member"
+                               value="member"
+                               {% if request.form.get('member_type') == 'member' %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="member_member" style="cursor:pointer;">
+                            <span class="fw-semibold">會員</span><br>
+                            <span class="text-muted small">自帶美容券，不扣店家庫存</span><br>
+                            <span class="text-muted small">基準售價 NT$ 3,100 / 張</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         步驟 ④ — 施作明細
+    ══════════════════════════════════════ -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">
+                <span class="badge bg-dark me-2">4</span>施作明細
+            </h5>
+
+            <div class="row g-3 mb-4">
+                <!-- 施作日期 -->
+                <div class="col-md-4">
+                    <label for="date" class="form-label small fw-semibold">施作日期 <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control" id="date" name="date"
+                           value="{{ request.form.date or today }}" required>
+                </div>
+
+                <!-- 張數 -->
+                <div class="col-md-4">
+                    <label for="voucher_count" class="form-label small fw-semibold">張數 <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="voucher_count" name="voucher_count"
+                           min="1" value="{{ request.form.voucher_count or 1 }}"
+                           required>
+                    <div class="form-text">非會員：每張扣減美容券庫存</div>
+                </div>
+
+                <!-- 實收金額（可改折扣） -->
+                <div class="col-md-4">
+                    <label for="actual_price" class="form-label small fw-semibold">
+                        實收金額（NT$）<span class="text-danger">*</span>
+                    </label>
+                    <input type="number" class="form-control" id="actual_price" name="actual_price"
+                           min="0" step="1"
+                           value="{{ request.form.actual_price or '' }}"
+                           placeholder="預設依基準售價×張數"
+                           required>
+                    <div class="form-text" id="priceHint">可依折扣調整，後端依實收重算淨利</div>
+                </div>
+            </div>
+
+            <!-- 耗材明細區塊 -->
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="form-label fw-semibold mb-0">耗材明細（消耗品）</label>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addConsumableRow">
+                        <i class="bi bi-plus me-1"></i>新增一列
+                    </button>
+                </div>
+                <div class="form-text mb-3">選擇本次施作使用的消耗品，填入數量；若為贈品請勾選。儀器設備不計入此處。</div>
+
+                <div id="consumableRows">
+                    <!-- 動態列，由 JS 管理 -->
+                </div>
+
+                <!-- 消耗品清單傳給 JS（data-id / data-name）-->
+                <datalist id="consumableList">
+                    {% for c in consumables %}
+                    <option value="{{ c.id }}" data-name="{{ c.name }}" data-stock="{{ c.qty_on_hand }}">{{ c.name }}（庫存 {{ c.qty_on_hand }}）</option>
+                    {% endfor %}
+                </datalist>
+                <!-- 供 JS 用的隱藏 JSON -->
+                <script id="consumableData" type="application/json">
+                    [{% for c in consumables %}{"id":{{ c.id }},"name":"{{ c.name }}","stock":{{ c.qty_on_hand }}}{% if not loop.last %},{% endif %}{% endfor %}]
+                </script>
+            </div>
+
+            <!-- 備註 -->
+            <div class="mb-3">
+                <label for="note" class="form-label small fw-semibold">備註（選填）</label>
+                <input type="text" class="form-control" id="note" name="note"
+                       placeholder="特殊折扣原因、客戶備註…"
+                       value="{{ request.form.note or '' }}">
+            </div>
+
+            <!-- 淨利預估提示 -->
+            <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4;" id="profitPreview">
+                <p class="small text-muted mb-1">預估淨利（前端試算，僅供參考）</p>
+                <p class="h5 fw-bold text-success mb-0" id="profitValue">—</p>
+                <p class="text-muted small mb-0">後端以實收金額重算為準</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提交 -->
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark btn-lg px-5 fw-semibold">
+            <i class="bi bi-check-circle me-2"></i>提交施作記錄
+        </button>
+        <a href="/service" class="btn btn-outline-secondary btn-lg">取消</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    // === 即時新增消費者展開 ===
+    const toggleBtn = document.getElementById('toggleNewCustomer');
+    const newFields = document.getElementById('newCustomerFields');
+    if (toggleBtn && newFields) {
+        const nameEl = document.getElementById('new_name');
+        if (nameEl && nameEl.value) newFields.style.display = '';
+        toggleBtn.addEventListener('click', function () {
+            const isHidden = newFields.style.display === 'none' || newFields.style.display === '';
+            newFields.style.display = isHidden ? 'block' : 'none';
+        });
+    }
+
+    // === 實收金額自動帶入基準售價×張數 ===
+    const productSelect   = document.getElementById('product_id');
+    const memberNonmember = document.getElementById('member_nonmember');
+    const memberMember    = document.getElementById('member_member');
+    const voucherCount    = document.getElementById('voucher_count');
+    const actualPrice     = document.getElementById('actual_price');
+    const priceHint       = document.getElementById('priceHint');
+    const profitValue     = document.getElementById('profitValue');
+
+    const VARIABLE_COST = 2620;
+    const OWNER_RETURN  = 10;
+
+    function getBasePrice() {
+        if (!productSelect) return 0;
+        const opt = productSelect.options[productSelect.selectedIndex];
+        if (!opt) return 0;
+        if (memberMember && memberMember.checked) {
+            return parseFloat(opt.dataset.memberPrice || 3100);
+        }
+        return parseFloat(opt.dataset.nonmemberPrice || 3980);
+    }
+
+    function updatePriceHint() {
+        const qty = parseInt(voucherCount.value) || 1;
+        const base = getBasePrice();
+        const suggested = base * qty;
+        priceHint.textContent = '基準售價 NT$' + base.toLocaleString() + ' × ' + qty + ' 張 = NT$' + suggested.toLocaleString();
+        if (!actualPrice._manuallyChanged) {
+            actualPrice.value = suggested;
+        }
+        updateProfit();
+    }
+
+    function updateProfit() {
+        const qty   = parseInt(voucherCount.value) || 0;
+        const price = parseFloat(actualPrice.value) || 0;
+        if (qty > 0 && price > 0) {
+            const profit = price - (VARIABLE_COST * qty) + (OWNER_RETURN * qty);
+            profitValue.textContent = 'NT$ ' + profit.toLocaleString();
+            profitValue.className = 'h5 fw-bold mb-0 ' + (profit >= 0 ? 'text-success' : 'text-danger');
+        } else {
+            profitValue.textContent = '—';
+            profitValue.className = 'h5 fw-bold mb-0 text-muted';
+        }
+    }
+
+    actualPrice._manuallyChanged = !!actualPrice.value;
+    actualPrice.addEventListener('input', function () {
+        this._manuallyChanged = true;
+        updateProfit();
+    });
+
+    [memberNonmember, memberMember].forEach(function (radio) {
+        if (!radio) return;
+        radio.addEventListener('change', function () {
+            actualPrice._manuallyChanged = false;
+            updatePriceHint();
+            document.getElementById('card-nonmember').style.borderColor =
+                memberNonmember.checked ? '#1d1d1f' : '';
+            document.getElementById('card-member').style.borderColor =
+                memberMember.checked ? '#1d1d1f' : '';
+        });
+    });
+
+    if (voucherCount) voucherCount.addEventListener('input', function () {
+        actualPrice._manuallyChanged = false;
+        updatePriceHint();
+    });
+    if (productSelect) productSelect.addEventListener('change', function () {
+        actualPrice._manuallyChanged = false;
+        updatePriceHint();
+    });
+
+    updatePriceHint();
+
+    if (memberNonmember && memberNonmember.checked) {
+        document.getElementById('card-nonmember').style.borderColor = '#1d1d1f';
+    }
+
+    // === 耗材明細動態列 ===
+    const consumableDataEl = document.getElementById('consumableData');
+    const consumables = consumableDataEl ? JSON.parse(consumableDataEl.textContent) : [];
+    const rowsContainer = document.getElementById('consumableRows');
+    const addBtn = document.getElementById('addConsumableRow');
+    let rowIndex = 0;
+
+    function buildOptions(selectedId) {
+        let html = '<option value="">— 選擇消耗品 —</option>';
+        consumables.forEach(function (c) {
+            const sel = (selectedId && String(c.id) === String(selectedId)) ? 'selected' : '';
+            html += '<option value="' + c.id + '" ' + sel + '>' + c.name + '（庫存 ' + c.stock + '）</option>';
+        });
+        return html;
+    }
+
+    function addRow(cid, qty, isGift) {
+        const idx = rowIndex++;
+        const div = document.createElement('div');
+        div.className = 'consumable-row row g-2 align-items-center mb-2';
+        div.dataset.idx = idx;
+        div.innerHTML =
+            '<div class="col-md-5">' +
+                '<select class="form-select form-select-sm" name="consumable_id_' + idx + '" required>' +
+                    buildOptions(cid) +
+                '</select>' +
+            '</div>' +
+            '<div class="col-md-3">' +
+                '<input type="number" class="form-control form-control-sm" name="consumable_qty_' + idx + '"' +
+                       ' min="1" value="' + (qty || 1) + '" placeholder="數量" required>' +
+            '</div>' +
+            '<div class="col-md-3 d-flex align-items-center gap-2">' +
+                '<div class="form-check mb-0">' +
+                    '<input class="form-check-input" type="checkbox" name="consumable_gift_' + idx + '" value="1"' +
+                           (isGift ? ' checked' : '') + ' id="gift_' + idx + '">' +
+                    '<label class="form-check-label small" for="gift_' + idx + '">贈品</label>' +
+                '</div>' +
+            '</div>' +
+            '<div class="col-md-1 text-end">' +
+                '<button type="button" class="btn btn-sm btn-outline-danger remove-row">✕</button>' +
+            '</div>';
+        rowsContainer.appendChild(div);
+
+        div.querySelector('.remove-row').addEventListener('click', function () {
+            div.remove();
+            reindexRows();
+        });
+    }
+
+    function reindexRows() {
+        // 重新指定每列欄位的 name index，確保後端解析連續
+        const rows = rowsContainer.querySelectorAll('.consumable-row');
+        rows.forEach(function (row, i) {
+            const sel   = row.querySelector('select');
+            const qty   = row.querySelector('input[type="number"]');
+            const chk   = row.querySelector('input[type="checkbox"]');
+            const lbl   = row.querySelector('label');
+            if (sel)   sel.name  = 'consumable_id_'   + i;
+            if (qty)   qty.name  = 'consumable_qty_'  + i;
+            if (chk) { chk.name  = 'consumable_gift_' + i; chk.id = 'gift_' + i; }
+            if (lbl)   lbl.htmlFor = 'gift_' + i;
+            row.dataset.idx = i;
+        });
+        rowIndex = rows.length;
+    }
+
+    if (addBtn) {
+        addBtn.addEventListener('click', function () {
+            addRow(null, 1, false);
+        });
+    }
+
+    // 預設加一列空列供快速填寫
+    if (consumables.length > 0) {
+        addRow(null, 1, false);
+    }
+
+    // 初始身份卡片高亮
+    if (memberNonmember && memberNonmember.checked) {
+        document.getElementById('card-nonmember').style.borderColor = '#1d1d1f';
+    }
+})();
+</script>
+{% endblock %}

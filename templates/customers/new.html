@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}新增消費者 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+{# 新增消費者，欄位對應 customers 表：name, phone, is_member, note #}
+
+<div class="mb-4">
+    <h2 class="h4 fw-bold mb-1">新增消費者</h2>
+    <p class="text-muted small mb-0">建立消費者檔案，之後施作記錄即可從下拉選取。</p>
+</div>
+
+<div class="card shadow-sm" style="max-width: 600px;">
+    <div class="card-body p-4">
+        <form method="POST" action="/customers/new">
+
+            <!-- 姓名 -->
+            <div class="mb-4">
+                <label for="name" class="form-label fw-semibold small">姓名 <span class="text-danger">*</span></label>
+                <input type="text"
+                       class="form-control"
+                       id="name"
+                       name="name"
+                       placeholder="消費者姓名"
+                       value="{{ request.form.name or '' }}"
+                       required
+                       autofocus>
+            </div>
+
+            <!-- 電話 -->
+            <div class="mb-4">
+                <label for="phone" class="form-label fw-semibold small">電話</label>
+                <input type="tel"
+                       class="form-control"
+                       id="phone"
+                       name="phone"
+                       placeholder="0912-345-678（選填）"
+                       value="{{ request.form.phone or '' }}">
+            </div>
+
+            <!-- 身份：會員 / 非會員 -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold small">身份</label>
+                <div class="d-flex gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               name="is_member" id="is_nonmember" value="0"
+                               {% if not request.form.get('is_member') or request.form.get('is_member') == '0' %}checked{% endif %}>
+                        <label class="form-check-label" for="is_nonmember">非會員（預設）</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               name="is_member" id="is_member" value="1"
+                               {% if request.form.get('is_member') == '1' %}checked{% endif %}>
+                        <label class="form-check-label" for="is_member">會員</label>
+                    </div>
+                </div>
+                <div class="form-text">可於施作時再選，此處設定預設身份</div>
+            </div>
+
+            <!-- 備註 -->
+            <div class="mb-5">
+                <label for="note" class="form-label fw-semibold small">備註（選填）</label>
+                <textarea class="form-control"
+                          id="note"
+                          name="note"
+                          rows="2"
+                          placeholder="特殊需求、過敏史…">{{ request.form.note or '' }}</textarea>
+            </div>
+
+            <!-- 按鈕列 -->
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-dark px-5 fw-semibold">
+                    <i class="bi bi-person-check me-2"></i>建立消費者
+                </button>
+                <a href="/customers" class="btn btn-outline-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

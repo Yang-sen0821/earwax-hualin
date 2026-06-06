@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}補充美容券 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+{#
+  補充美容券（voucher_purchases 表）
+  欄位：date, qty, unit_cost, total_cost, note
+  提交後後端 += qty 到 voucher_inventory.qty_on_hand
+#}
+
+<div class="mb-4">
+    <h2 class="h4 fw-bold mb-1">補充美容券</h2>
+    <p class="text-muted small mb-0">填寫補貨資訊，提交後自動增加美容券庫存。</p>
+</div>
+
+<!-- 目前庫存快覽 -->
+{% if current_stock is defined %}
+<div class="card shadow-sm mb-4 border-0" style="background:#f0fdf4;">
+    <div class="card-body p-3">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-ticket-perforated fs-3 text-success"></i>
+            <div>
+                <p class="text-muted small mb-0">目前美容券庫存</p>
+                <p class="h4 fw-bold text-success mb-0">{{ current_stock }} 張</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 補貨表單 -->
+<div class="card shadow-sm mb-5" style="max-width: 560px;">
+    <div class="card-body p-4">
+        <form method="POST" action="/purchases/voucher" id="voucherForm">
+
+            <!-- 日期 -->
+            <div class="mb-4">
+                <label for="date" class="form-label fw-semibold small">補貨日期 <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="date" name="date"
+                       value="{{ request.form.date or today }}" required>
+            </div>
+
+            <!-- 數量 -->
+            <div class="mb-4">
+                <label for="qty" class="form-label fw-semibold small">補充張數 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="qty" name="qty"
+                       min="1"
+                       value="{{ request.form.qty or '' }}"
+                       placeholder="例：10"
+                       required>
+            </div>
+
+            <!-- 單價 -->
+            <div class="mb-4">
+                <label for="unit_cost" class="form-label fw-semibold small">單價（NT$）<span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="unit_cost" name="unit_cost"
+                       min="0" step="1"
+                       value="{{ request.form.unit_cost or '' }}"
+                       placeholder="每張成本"
+                       required>
+            </div>
+
+            <!-- 小計（自動計算，唯讀） -->
+            <div class="mb-4">
+                <label for="total_cost" class="form-label fw-semibold small">小計（NT$）</label>
+                <input type="number" class="form-control bg-light" id="total_cost" name="total_cost"
+                       min="0" step="1"
+                       value="{{ request.form.total_cost or '' }}"
+                       placeholder="自動計算（可手動覆寫）">
+                <div class="form-text">依 張數 × 單價 自動填入，如有折扣可手動修改</div>
+            </div>
+
+            <!-- 備註 -->
+            <div class="mb-5">
+                <label for="note" class="form-label fw-semibold small">備註（選填）</label>
+                <input type="text" class="form-control" id="note" name="note"
+                       placeholder="廠商、批號…"
+                       value="{{ request.form.note or '' }}">
+            </div>
+
+            <!-- 按鈕列 -->
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-dark px-5 fw-semibold">
+                    <i class="bi bi-plus-circle me-2"></i>確認補貨
+                </button>
+                <a href="/inventory" class="btn btn-outline-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 最近補貨紀錄 -->
+<h6 class="text-muted fw-semibold small text-uppercase mb-3">最近補貨記錄</h6>
+<div class="card shadow-sm">
+    {% if purchases %}
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">日期</th>
+                    <th class="text-center">張數</th>
+                    <th class="text-end">單價（NT$）</th>
+                    <th class="text-end">小計（NT$）</th>
+                    <th>備註</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in purchases %}
+                <tr>
+                    <td class="ps-4 text-muted">{{ p.date }}</td>
+                    <td class="text-center fw-semibold">{{ p.qty }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(p.unit_cost) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(p.total_cost) }}</td>
+                    <td class="text-muted">{{ p.note or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body text-center text-muted py-3">尚無補貨記錄</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    // 自動計算小計
+    const qtyInput = document.getElementById('qty');
+    const unitInput = document.getElementById('unit_cost');
+    const totalInput = document.getElementById('total_cost');
+
+    function calcTotal() {
+        const qty = parseFloat(qtyInput.value) || 0;
+        const unit = parseFloat(unitInput.value) || 0;
+        if (qty > 0 && unit > 0) {
+            totalInput.value = qty * unit;
+        }
+    }
+
+    // 若使用者沒手動改過小計才自動填
+    let totalManual = !!totalInput.value;
+    totalInput.addEventListener('input', () => { totalManual = true; });
+
+    [qtyInput, unitInput].forEach(el => {
+        el.addEventListener('input', () => {
+            if (!totalManual) calcTotal();
+        });
+    });
+})();
+</script>
+{% endblock %}

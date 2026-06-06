@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}樺林美學 E•ar Wax{% endblock %}</title>
+
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <style>
+        /* Apple 風格：高留白、極簡、無多餘裝飾 */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f5f5f7;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            color: #1d1d1f;
+        }
+        main {
+            flex: 1;
+        }
+        .navbar {
+            background-color: rgba(255, 255, 255, 0.92) !important;
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+        }
+        .navbar-brand {
+            font-size: 1.05rem;
+            letter-spacing: -0.3px;
+        }
+        .nav-link {
+            font-size: 0.9rem;
+            color: #424245 !important;
+        }
+        .nav-link:hover {
+            color: #000 !important;
+        }
+        /* 卡片統一樣式 */
+        .card {
+            border: none;
+            border-radius: 14px;
+        }
+        .card.shadow-sm {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07) !important;
+        }
+        footer {
+            background-color: #f5f5f7;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 2rem 0;
+            text-align: center;
+            color: #6e6e73;
+            margin-top: auto;
+            font-size: 0.85rem;
+        }
+        /* Flash 訊息動畫 */
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 導覽列 -->
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="bi bi-ear me-1"></i> 樺林美學
+            </a>
+            <button class="navbar-toggler border-0" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+                    {% if session.user %}
+                        {# owner 專屬：後台儀表板 #}
+                        {% if session.user.role == 'owner' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">
+                                <i class="bi bi-grid-1x2 me-1"></i>後台儀表板
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {# 施作記錄 #}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/service/new">
+                                <i class="bi bi-plus-circle me-1"></i>新增施作
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/service">
+                                <i class="bi bi-list-ul me-1"></i>施作記錄
+                            </a>
+                        </li>
+
+                        {# 消費者 #}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/customers">
+                                <i class="bi bi-people me-1"></i>消費者
+                            </a>
+                        </li>
+
+                        {# 庫存與補貨 #}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-box me-1"></i>庫存
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
+                                <li><a class="dropdown-item" href="/inventory">
+                                    <i class="bi bi-layers me-2 text-muted"></i>庫存總覽
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/purchases/voucher">
+                                    <i class="bi bi-ticket-perforated me-2 text-muted"></i>補充美容券
+                                </a></li>
+                                <li><a class="dropdown-item" href="/purchases/consumable">
+                                    <i class="bi bi-bag me-2 text-muted"></i>補充消耗品
+                                </a></li>
+                            </ul>
+                        </li>
+
+                        {# 使用者資訊與登出 #}
+                        <li class="nav-item d-flex align-items-center ms-lg-2">
+                            <span class="text-muted small me-2">
+                                <i class="bi bi-person-circle me-1"></i>{{ session.user.name }}
+                                {% if session.user.role == 'owner' %}
+                                <span class="badge bg-dark bg-opacity-10 text-dark ms-1" style="font-size:0.7rem;">老闆</span>
+                                {% endif %}
+                            </span>
+                            <a href="/logout" class="btn btn-sm btn-outline-secondary">登出</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash 訊息區 -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{% if category == 'error' %}danger{% elif category == 'warning' %}warning{% else %}{{ category }}{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                {% if category == 'success' %}<i class="bi bi-check-circle me-2"></i>
+                {% elif category == 'error' %}<i class="bi bi-exclamation-circle me-2"></i>
+                {% elif category == 'warning' %}<i class="bi bi-exclamation-triangle me-2"></i>
+                {% else %}<i class="bi bi-info-circle me-2"></i>{% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- 主內容 -->
+    <main class="py-5">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p class="mb-0">樺林美學 E•ar Wax &copy; 2026</p>
+    </footer>
+
+    <!-- Bootstrap 5.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

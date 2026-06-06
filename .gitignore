@@ -1,0 +1,33 @@
+# 環境變數（含密碼，絕對不 commit）
+.env
+
+# Python 快取
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虛擬環境
+.venv/
+venv/
+env/
+
+# IDE / 系統
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地測試輸出
+*.log
+debug_out.txt
+
+# 原始業務資料 / 報表（不進部署 repo）
+# 面膜屬 Flora Court 獨立主體須隔離；Excel 與報表為工作檔，非部署所需
+*.xlsx
+_*.md
+
+# SQLite 測試殘留 / Flask instance
+instance/
+*.db
+*.sqlite3

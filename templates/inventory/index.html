@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}庫存總覽 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+{#
+  庫存總覽：
+  ① 美容券庫存（voucher_inventory）
+  ② 消耗品庫存（consumables，category='consumable'，逐項列 qty）
+  ③ 儀器設備清單（equipment，category='equipment'，只列清單不顯數量扣減）
+#}
+
+<div class="mb-5">
+    <h2 class="h4 fw-bold mb-1">庫存總覽</h2>
+    <p class="text-muted small mb-0">美容券與消耗品現況，補貨請點各區塊右上角按鈕。</p>
+</div>
+
+<!-- ────────────────────────────────────
+     ① 美容券庫存
+──────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-semibold mb-0">
+        <i class="bi bi-ticket-perforated me-2 text-dark"></i>美容券庫存
+    </h5>
+    <a href="/purchases/voucher" class="btn btn-sm btn-outline-dark">
+        <i class="bi bi-plus me-1"></i>補充美容券
+    </a>
+</div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-body p-4">
+        {% if voucher_inventory %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>產品</th>
+                        <th class="text-center">現有庫存（張）</th>
+                        <th>狀態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vi in voucher_inventory %}
+                    <tr>
+                        <td class="fw-semibold">{{ vi.product.name if vi.product else '—' }}</td>
+                        <td class="text-center">
+                            <span class="h5 fw-bold
+                                {% if vi.qty_on_hand <= 0 %}text-danger
+                                {% elif vi.qty_on_hand <= 5 %}text-warning
+                                {% else %}text-success{% endif %}">
+                                {{ vi.qty_on_hand }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if vi.qty_on_hand <= 0 %}
+                            <span class="badge bg-danger">庫存不足</span>
+                            {% elif vi.qty_on_hand <= 5 %}
+                            <span class="badge bg-warning text-dark">庫存偏低</span>
+                            {% else %}
+                            <span class="badge bg-success bg-opacity-10 text-success">充足</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-3">尚無券庫存資料</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 美容券補貨記錄 -->
+<div class="mb-3">
+    <h6 class="text-muted fw-semibold small text-uppercase">最近美容券補貨記錄</h6>
+</div>
+<div class="card shadow-sm mb-5">
+    {% if voucher_purchases %}
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">日期</th>
+                    <th class="text-center">數量（張）</th>
+                    <th class="text-end">單價（NT$）</th>
+                    <th class="text-end">小計（NT$）</th>
+                    <th>備註</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vp in voucher_purchases %}
+                <tr>
+                    <td class="ps-4 text-muted">{{ vp.date }}</td>
+                    <td class="text-center fw-semibold">{{ vp.qty }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(vp.unit_cost) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(vp.total_cost) }}</td>
+                    <td class="text-muted">{{ vp.note or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body text-center text-muted py-3">尚無補貨記錄</div>
+    {% endif %}
+</div>
+
+<!-- ────────────────────────────────────
+     ② 消耗品庫存（管庫存，施作時逐次扣用）
+──────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-semibold mb-0">
+        <i class="bi bi-box-seam me-2 text-dark"></i>消耗品庫存
+    </h5>
+    <a href="/purchases/consumable" class="btn btn-sm btn-outline-dark">
+        <i class="bi bi-plus me-1"></i>補充消耗品
+    </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+        {% if consumables %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>品項名稱</th>
+                        <th class="text-center">現有數量</th>
+                        <th class="text-end">單價（NT$）</th>
+                        <th>備註</th>
+                        <th>狀態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in consumables %}
+                    <tr>
+                        <td class="fw-semibold">{{ c.name }}</td>
+                        <td class="text-center">
+                            <span class="h5 fw-bold
+                                {% if c.qty_on_hand <= 0 %}text-danger
+                                {% elif c.qty_on_hand <= 10 %}text-warning
+                                {% else %}text-success{% endif %}">
+                                {{ c.qty_on_hand }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% if c.unit_cost %}
+                            {{ "{:,.0f}".format(c.unit_cost) }}
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ c.note or '—' }}</td>
+                        <td>
+                            {% if c.qty_on_hand <= 0 %}
+                            <span class="badge bg-danger">庫存不足</span>
+                            {% elif c.qty_on_hand <= 10 %}
+                            <span class="badge bg-warning text-dark">庫存偏低</span>
+                            {% else %}
+                            <span class="badge bg-success bg-opacity-10 text-success">充足</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-3">尚無消耗品庫存資料</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 消耗品補貨記錄 -->
+<div class="mb-3">
+    <h6 class="text-muted fw-semibold small text-uppercase">最近消耗品補貨記錄</h6>
+</div>
+<div class="card shadow-sm mb-5">
+    {% if consumable_purchases %}
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">日期</th>
+                    <th>品項</th>
+                    <th class="text-center">數量</th>
+                    <th class="text-end">單價（NT$）</th>
+                    <th class="text-end">小計（NT$）</th>
+                    <th>備註</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cp in consumable_purchases %}
+                <tr>
+                    <td class="ps-4 text-muted">{{ cp.date }}</td>
+                    <td>{{ cp.consumable.name if cp.consumable else '—' }}</td>
+                    <td class="text-center fw-semibold">{{ cp.qty }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(cp.unit_cost) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(cp.total_cost) }}</td>
+                    <td class="text-muted">{{ cp.note or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body text-center text-muted py-3">尚無補貨記錄</div>
+    {% endif %}
+</div>
+
+<!-- ────────────────────────────────────
+     ③ 儀器設備清單（固定資產，只列清單，不顯示扣減）
+──────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-semibold mb-0">
+        <i class="bi bi-wrench-adjustable me-2 text-dark"></i>儀器設備清單
+    </h5>
+    <span class="text-muted small">固定資產，不逐次扣用</span>
+</div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-body p-4">
+        {% if equipment %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>設備名稱</th>
+                        <th class="text-end">單價（NT$）</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in equipment %}
+                    <tr>
+                        <td class="fw-semibold">{{ e.name }}</td>
+                        <td class="text-end">
+                            {% if e.unit_cost %}
+                            {{ "{:,.0f}".format(e.unit_cost) }}
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ e.note or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-3">尚無儀器設備資料</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

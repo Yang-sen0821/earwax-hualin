@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}登入 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+{# 登入頁：全螢幕垂直置中，Apple 極簡卡片 #}
+<div class="min-vh-100 d-flex align-items-center justify-content-center" style="margin-top:-4rem;">
+    <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-5">
+
+            <!-- 品牌標題 -->
+            <div class="text-center mb-5">
+                <div class="mb-3" style="font-size: 2.5rem;">🌿</div>
+                <h1 class="h3 fw-bold mb-1">樺林美學</h1>
+                <p class="text-muted small mb-0">E•ar Wax 施作管理系統</p>
+            </div>
+
+            <!-- 登入表單 -->
+            <form method="POST" action="/login">
+                <!-- 帳號 -->
+                <div class="mb-4">
+                    <label for="username" class="form-label fw-semibold small">帳號</label>
+                    <input type="text"
+                           class="form-control form-control-lg"
+                           id="username"
+                           name="username"
+                           placeholder="輸入帳號"
+                           required
+                           autofocus
+                           autocomplete="username">
+                </div>
+
+                <!-- 密碼 -->
+                <div class="mb-5">
+                    <label for="password" class="form-label fw-semibold small">密碼</label>
+                    <input type="password"
+                           class="form-control form-control-lg"
+                           id="password"
+                           name="password"
+                           placeholder="輸入密碼"
+                           required
+                           autocomplete="current-password">
+                </div>
+
+                <!-- 登入按鈕 -->
+                <button type="submit" class="btn btn-dark btn-lg w-100 fw-semibold">
+                    登入
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: earwax-hualin
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    # 環境變數請在 Render Dashboard 手動設定，不在此 YAML 定義（避免密碼外洩）
+    # 必填：SECRET_KEY、DATABASE_URL
+    # 選填種子帳密（init_db.py 用）：OWNER_USER、OWNER_PASS、STAFF_USER、STAFF_PASS
