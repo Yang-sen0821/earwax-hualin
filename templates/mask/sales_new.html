@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}面膜銷售 KEY 單 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 640px;">
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <i class="bi bi-plus-circle fs-4"></i>
+    <h4 class="mb-0 fw-semibold">面膜銷售 KEY 單</h4>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <form method="POST" action="/mask/sales/new">
+        <!-- 日期 -->
+        <div class="mb-4">
+          <label class="form-label fw-medium">銷售日期</label>
+          <input type="date" name="date" class="form-control"
+                 value="{{ today }}" required>
+        </div>
+
+        <p class="text-muted small mb-3">請依品項填入數量與金額（公關品項僅填數量）</p>
+
+        <!-- ① 一般盒裝 -->
+        <div class="card mb-3 border">
+          <div class="card-body py-3">
+            <p class="fw-medium mb-2">① 一般盒裝</p>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">數量（盒）</label>
+                <input type="number" name="general_box_qty" class="form-control"
+                       min="0" value="0" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">金額（元）</label>
+                <input type="number" name="general_box_amount" class="form-control"
+                       min="0" step="0.01" value="0" required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ② 公關盒裝 -->
+        <div class="card mb-3 border">
+          <div class="card-body py-3">
+            <p class="fw-medium mb-2">② 公關盒裝
+              <span class="badge bg-warning text-dark ms-1 small">公關</span>
+            </p>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">數量（盒）</label>
+                <input type="number" name="pr_box_qty" class="form-control"
+                       min="0" value="0" required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ 一般單片 -->
+        <div class="card mb-3 border">
+          <div class="card-body py-3">
+            <p class="fw-medium mb-2">③ 一般單片</p>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">數量（片）</label>
+                <input type="number" name="general_piece_qty" class="form-control"
+                       min="0" value="0" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">金額（元）</label>
+                <input type="number" name="general_piece_amount" class="form-control"
+                       min="0" step="0.01" value="0" required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ④ 公關單片 -->
+        <div class="card mb-3 border">
+          <div class="card-body py-3">
+            <p class="fw-medium mb-2">④ 公關單片
+              <span class="badge bg-warning text-dark ms-1 small">公關</span>
+            </p>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">數量（片）</label>
+                <input type="number" name="pr_piece_qty" class="form-control"
+                       min="0" value="0" required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑤ 包裝袋 -->
+        <div class="card mb-4 border">
+          <div class="card-body py-3">
+            <p class="fw-medium mb-2">⑤ 包裝袋</p>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small text-muted mb-1">數量（個）</label>
+                <input type="number" name="bag_qty" class="form-control"
+                       min="0" value="0" required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 備註 -->
+        <div class="mb-4">
+          <label class="form-label fw-medium">備註（選填）</label>
+          <textarea name="note" class="form-control" rows="2"
+                    placeholder="如客戶名稱、活動說明…"></textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-dark px-4">儲存</button>
+          <a href="/mask/sales" class="btn btn-outline-secondary px-4">取消</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

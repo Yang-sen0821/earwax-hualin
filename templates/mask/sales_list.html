@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}面膜銷售記錄 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-list-ul fs-4"></i>
+      <h4 class="mb-0 fw-semibold">面膜銷售記錄</h4>
+    </div>
+    <a href="/mask/sales/new" class="btn btn-dark btn-sm">
+      <i class="bi bi-plus me-1"></i>新增 KEY 單
+    </a>
+  </div>
+
+  <!-- 桌面版表格 -->
+  <div class="card shadow-sm d-none d-md-block">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">日期</th>
+            <th class="text-center">一般盒<br><small class="text-muted fw-normal">數量</small></th>
+            <th class="text-center">公關盒<br><small class="text-muted fw-normal">數量</small></th>
+            <th class="text-center">一般單片<br><small class="text-muted fw-normal">數量</small></th>
+            <th class="text-center">公關單片<br><small class="text-muted fw-normal">數量</small></th>
+            <th class="text-center">包裝袋<br><small class="text-muted fw-normal">數量</small></th>
+            <th class="text-end pe-4">該筆收入</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sales %}
+          <tr>
+            <td class="ps-4">{{ s.date }}</td>
+            <td class="text-center">{{ s.general_box_qty }}</td>
+            <td class="text-center">
+              {% if s.pr_box_qty %}
+              <span class="badge bg-warning text-dark">{{ s.pr_box_qty }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">{{ s.general_piece_qty }}</td>
+            <td class="text-center">
+              {% if s.pr_piece_qty %}
+              <span class="badge bg-warning text-dark">{{ s.pr_piece_qty }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">{{ s.bag_qty }}</td>
+            <td class="text-end pe-4 fw-medium">
+              NT$ {{ "{:,.0f}".format(s.general_box_amount + s.general_piece_amount) }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">尚無銷售記錄</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if sales %}
+        <tfoot class="table-light">
+          <tr>
+            <td class="ps-4 fw-semibold">合計</td>
+            <td class="text-center fw-semibold">{{ sales | sum(attribute='general_box_qty') }}</td>
+            <td class="text-center fw-semibold">{{ sales | sum(attribute='pr_box_qty') }}</td>
+            <td class="text-center fw-semibold">{{ sales | sum(attribute='general_piece_qty') }}</td>
+            <td class="text-center fw-semibold">{{ sales | sum(attribute='pr_piece_qty') }}</td>
+            <td class="text-center fw-semibold">{{ sales | sum(attribute='bag_qty') }}</td>
+            <td class="text-end pe-4 fw-semibold">
+              NT$ {{ "{:,.0f}".format(total_revenue) }}
+            </td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+
+  <!-- 手機版卡片列表 -->
+  <div class="d-md-none">
+    {% for s in sales %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="fw-semibold">{{ s.date }}</span>
+          <span class="fw-semibold text-dark">
+            NT$ {{ "{:,.0f}".format(s.general_box_amount + s.general_piece_amount) }}
+          </span>
+        </div>
+        <div class="row g-1 small text-muted">
+          <div class="col-6">一般盒裝：{{ s.general_box_qty }} 盒</div>
+          <div class="col-6">
+            公關盒裝：
+            {% if s.pr_box_qty %}<span class="text-warning fw-medium">{{ s.pr_box_qty }}</span>{% else %}—{% endif %}
+          </div>
+          <div class="col-6">一般單片：{{ s.general_piece_qty }} 片</div>
+          <div class="col-6">
+            公關單片：
+            {% if s.pr_piece_qty %}<span class="text-warning fw-medium">{{ s.pr_piece_qty }}</span>{% else %}—{% endif %}
+          </div>
+          <div class="col-6">包裝袋：{{ s.bag_qty }} 個</div>
+        </div>
+        {% if s.note %}
+        <p class="small text-muted mt-2 mb-0"><i class="bi bi-chat-left-text me-1"></i>{{ s.note }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">尚無銷售記錄</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

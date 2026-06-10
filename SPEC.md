@@ -6,9 +6,10 @@
 
 ## 0. 設計定案（來自森哥逐題確認；2026-06-06 客戶回饋大修）
 - **1 個代理產品**：愛啪啪（外泌體服務）。本系統＝愛啪啪南科店單一營運主體。
-- **⚠️ 面膜（Flora Court）完全移出本系統**：客戶自有品牌、不同營運主體，研發/進貨/庫存/盈虧
-  獨立核算，**嚴禁混入愛啪啪**。現場只談愛啪啪、私領域不公布 → 店內系統只能有愛啪啪。
-  （未來若於愛啪啪通路寄售，另做「僅老闆可見」的合作/寄售模組，不在本期。）
+- **⚠️〔2026-06-10 已修訂，見 §8〕面膜（Flora Court）**：原定「完全移出本系統」，森哥
+  2026-06-10 改為**獨立代理產品**——與愛啪啪**平行**的獨立模組（獨立頁面/成本/庫存/ROI，
+  獨立核算，**不與愛啪啪混帳**）。本點原「移出」決策自即日失效，**一律以 §8 面膜模組為準**。
+  獨立核算原則不變：面膜數據**不計入愛啪啪損益與 §4 全店總覽**。
 - **真耗材**分兩類：
   - **消耗品**（管庫存+補貨+每次施作扣用）：針筒、耳塞、安瓶、洗卸品、洗臉巾、防曬
   - **儀器設備**（固定資產，只記清單不逐次扣）：導入儀、氣壓儀器、頭皮臉部偵測儀、台車、破壁機
@@ -126,5 +127,67 @@ purchases/voucher.html, purchases/consumable.html
 - `python -c "import app"` 不報錯
 - init_db.py 可建表 + 種子（對空 DB）
 - 登入 owner 看得到儀表板；staff 看不到後台只能登錄
-- 4 步登錄一筆非會員 → 券庫存 −張數、所選消耗品 −用量、profit 正確；系統內無面膜
+- 4 步登錄一筆非會員 → 券庫存 −張數、所選消耗品 −用量、profit 正確
 - README/啟動說明.md 寫清楚：環境變數、建 Supabase、init_db、跑起來步驟
+
+## 8. 面膜模組（Flora Court，2026-06-10 新增；推翻 §0「面膜移出」決策）
+
+> 森哥 2026-06-10 定案：面膜改作**獨立代理產品**，與愛啪啪**平行**掛在同一 earwax 系統／
+> 同一 Supabase `earwax` schema，新增獨立頁面與資料表，**獨立核算、不與愛啪啪混帳**。
+> 本節推翻 §0 第二點「面膜完全移出」；該決策即日失效，以本節為準。
+
+### 8.1 範圍與權限
+- 面膜＝獨立主體：自己的銷售/成本/庫存/ROI，**不計入愛啪啪損益、不計入 §4 全店總覽**（§4 不變，全店仍＝愛啪啪單一主體）。
+- 權限比照愛啪啪：**staff 可 KEY 銷售單**；**owner 可看 ROI 後台與成本頁**。
+- 新增 blueprint `mask`（mask_bp），與既有 blueprints 平行，不動既有愛啪啪程式。
+
+### 8.2 銷售 KEY 單（5 項固定）
+每筆銷售一列，5 個品項，每項都有「數量欄」可 KEY；只有「一般」項有「金額欄＝該筆實收總額(可折扣)」：
+
+| # | 品項 | 數量 | 金額(實收) | 性質 |
+|---|------|------|-----------|------|
+| 1 | 一般盒裝 general_box | ✅ | ✅ | 販售，計收入 |
+| 2 | 公關盒裝 pr_box | ✅ | — | 贈送，無收入，扣庫存 |
+| 3 | 一般單片 general_piece | ✅ | ✅ | 販售，計收入 |
+| 4 | 公關單片 pr_piece | ✅ | — | 贈送，無收入，扣庫存 |
+| 5 | 包裝袋 bag | ✅ | — | 耗材，扣庫存 |
+
+- 該筆收入 = 一般盒裝金額 + 一般單片金額（公關、包裝袋不計收入）。
+- 送出副作用（同一 transaction，不足要擋並提示）：5 項數量各自扣對應的 5 個獨立庫存。
+
+### 8.3 成本頁（可增減品項 + 輸入金額）
+- 自由新增/刪除成本品項，每項一個名稱 + 一個金額（無固定品項清單）。
+- **面膜已投入成本總額 = Σ 所有成本品項金額**（供 ROI 用）。
+
+### 8.4 庫存（5 個獨立庫存）
+- 一般盒、公關盒、一般片、公關片、包裝材，**各自獨立計算，互不換算**。
+- 庫存頁顯示 5 項當前數量 + 補貨輸入（增加對應庫存）；KEY 銷售單時各自扣減。
+- ⏳ 初始品項細節（單位/初始數量/是否有單位成本）以森哥下午提供的庫存清單為準（僅 seed 用，不改本模型）。
+
+### 8.5 ROI / 面膜獨立顯示頁（owner）
+- 累積收入 = Σ(一般盒裝金額 + 一般單片金額)
+- 已投入成本 = §8.3 成本頁總額
+- 面膜淨利 = 累積收入 − 已投入成本；回本進度 = 累積收入 / 已投入成本
+- 統計：各項銷量（含公關贈送數）、包裝袋用量；期間篩選 start/end（比照 §4）。
+
+### 8.6 資料模型（earwax schema，新增表，不動既有表）
+- `mask_sales`：id, date, general_box_qty, general_box_amount, pr_box_qty,
+  general_piece_qty, general_piece_amount, pr_piece_qty, bag_qty, note, created_at
+- `mask_cost_items`：id, name, amount(Float), note, created_at
+- `mask_inventory`：id, item_key(`general_box`|`pr_box`|`general_piece`|`pr_piece`|`bag`),
+  name, qty_on_hand(Integer), created_at（種子 5 列、初始 0）
+- `mask_purchases`：id, date, item_key, qty(Integer), note, created_at（補貨 → 增 mask_inventory）
+
+### 8.7 路由 / 模板
+- `mask_bp`：
+  - `/mask`（owner）面膜 ROI 儀表板（獨立顯示頁）
+  - `/mask/sales/new`（staff）銷售 KEY 單；`/mask/sales` 列表
+  - `/mask/cost`（owner）成本頁（增減品項+金額）
+  - `/mask/inventory` 庫存頁 + 補貨
+- 模板：mask/dashboard.html, mask/sales_new.html, mask/sales_list.html, mask/cost.html, mask/inventory.html
+- base.html 導覽列新增「面膜」入口（staff 見 KEY 單；owner 多見 ROI/成本）。
+
+### 8.8 驗收
+- init_db 追加 mask_inventory 5 列種子（qty 0）；不影響既有愛啪啪表與泰安 public schema。
+- staff 可開 /mask/sales/new KEY 一筆 → 5 庫存各扣、該筆收入正確；owner /mask 看到回本=收入−成本總額。
+- 面膜數據完全不污染愛啪啪 §4 全店總覽。

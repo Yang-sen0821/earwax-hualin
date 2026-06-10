@@ -253,3 +253,70 @@ class ServiceConsumable(db.Model):
     qty = db.Column(db.Integer, nullable=False, default=1)             # 本次用量
     is_gift = db.Column(db.Boolean, nullable=False, default=False)     # 是否為贈品
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ======================================================================
+# MaskSale — 面膜銷售記錄（SPEC §8.6）
+# ======================================================================
+
+class MaskSale(db.Model):
+    """面膜銷售記錄；依通路（盒裝/單片/包裝袋）與會員屬性分欄位記錄。"""
+    __tablename__ = "mask_sales"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    date = db.Column(db.String(50), nullable=False)                    # 銷售日期
+    general_box_qty = db.Column(db.Integer, default=0)                 # 一般盒裝數量
+    general_box_amount = db.Column(db.Float, default=0)                # 一般盒裝金額
+    pr_box_qty = db.Column(db.Integer, default=0)                      # 公關盒裝數量
+    general_piece_qty = db.Column(db.Integer, default=0)               # 一般單片數量
+    general_piece_amount = db.Column(db.Float, default=0)              # 一般單片金額
+    pr_piece_qty = db.Column(db.Integer, default=0)                    # 公關單片數量
+    bag_qty = db.Column(db.Integer, default=0)                         # 包裝袋數量
+    note = db.Column(db.Text, nullable=True)                           # 備註（可空）
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ======================================================================
+# MaskCostItem — 面膜成本項目（SPEC §8.6）
+# ======================================================================
+
+class MaskCostItem(db.Model):
+    """面膜成本項目主檔；記錄各類成本名稱與金額，供 ROI 儀表板使用。"""
+    __tablename__ = "mask_cost_items"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)                   # 成本項目名稱
+    amount = db.Column(db.Float, nullable=False)                       # 成本金額
+    note = db.Column(db.Text, default="")                              # 備註
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ======================================================================
+# MaskInventory — 面膜庫存（SPEC §8.6）
+# ======================================================================
+
+class MaskInventory(db.Model):
+    """面膜庫存；以 item_key 對應固定品項（general_box/pr_box/general_piece/pr_piece/bag）。"""
+    __tablename__ = "mask_inventory"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    item_key = db.Column(db.String(50), nullable=False, unique=True)   # 品項識別鍵
+    name = db.Column(db.String(100), nullable=False)                   # 品項顯示名稱
+    qty_on_hand = db.Column(db.Integer, default=0)                     # 現有庫存數量
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ======================================================================
+# MaskPurchase — 面膜進貨記錄（SPEC §8.6）
+# ======================================================================
+
+class MaskPurchase(db.Model):
+    """面膜進貨記錄；每筆進貨後自動增加 mask_inventory.qty_on_hand。"""
+    __tablename__ = "mask_purchases"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    date = db.Column(db.String(50), nullable=False)                    # 進貨日期
+    item_key = db.Column(db.String(50), nullable=False)                # 對應 mask_inventory.item_key
+    qty = db.Column(db.Integer, nullable=False)                        # 本次進貨數量
+    note = db.Column(db.Text, default="")                              # 備註
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

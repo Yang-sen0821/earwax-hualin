@@ -12,6 +12,7 @@ from blueprints.customers import customers_bp
 from blueprints.inventory import inventory_bp
 from blueprints.purchases import purchases_bp
 from blueprints.dashboard import dashboard_bp
+from blueprints.mask import mask_bp
 
 # ── App 初始化 ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -42,6 +43,7 @@ app.register_blueprint(service_bp)
 app.register_blueprint(customers_bp)
 app.register_blueprint(inventory_bp)
 app.register_blueprint(purchases_bp)
+app.register_blueprint(mask_bp)        # 面膜模組（url_prefix=/mask，blueprint 內已定義）
 app.register_blueprint(dashboard_bp)   # 掛 /（dashboard.index）
 
 

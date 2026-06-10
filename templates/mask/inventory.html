@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}面膜庫存管理 — 樺林美學 E•ar Wax{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 720px;">
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <i class="bi bi-box-seam fs-4"></i>
+    <h4 class="mb-0 fw-semibold">面膜庫存管理</h4>
+  </div>
+
+  <!-- 當前庫存 -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body p-0">
+      <div class="px-4 py-3 border-bottom">
+        <h6 class="fw-semibold mb-0">當前庫存</h6>
+      </div>
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">品項</th>
+            <th class="text-center">庫存數量</th>
+            <th class="text-end pe-4">狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in inventory %}
+          <tr>
+            <td class="ps-4">
+              {{ item.name }}
+              <small class="text-muted ms-1">({{ item.item_key }})</small>
+            </td>
+            <td class="text-center">
+              <span class="fw-semibold {% if item.qty_on_hand == 0 %}text-danger{% elif item.qty_on_hand <= 10 %}text-warning{% else %}text-success{% endif %}">
+                {{ item.qty_on_hand }}
+              </span>
+            </td>
+            <td class="text-end pe-4">
+              {% if item.qty_on_hand == 0 %}
+              <span class="badge bg-danger">缺貨</span>
+              {% elif item.qty_on_hand <= 10 %}
+              <span class="badge bg-warning text-dark">偏低</span>
+              {% else %}
+              <span class="badge bg-success bg-opacity-10 text-success">正常</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 補貨表單 -->
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <h6 class="fw-semibold mb-3">補貨入庫</h6>
+      <form method="POST" action="/mask/inventory/restock">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-muted mb-1">選擇品項</label>
+            <select name="item_key" class="form-select" required>
+              <option value="" disabled selected>-- 請選擇 --</option>
+              {% for item in inventory %}
+              <option value="{{ item.item_key }}">{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-muted mb-1">補貨數量</label>
+            <input type="number" name="qty" class="form-control"
+                   min="1" placeholder="0" required>
+          </div>
+          <div class="col-12 col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-dark w-100">入庫</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

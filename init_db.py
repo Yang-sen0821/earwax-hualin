@@ -35,6 +35,7 @@ from db import (
     VoucherInventory,
     Consumable,
     ServiceConsumable,
+    MaskInventory,
 )
 
 
@@ -174,6 +175,36 @@ def seed_consumables():
     db.session.commit()
 
 
+def seed_mask_inventory():
+    """種子：面膜 5 項獨立庫存（SPEC §8.4/§8.6/§8.8），初始 qty_on_hand=0。
+
+    冪等：依 item_key 判斷，已存在就略過。各品項互不換算（SPEC §8.4）。
+    """
+    mask_items = [
+        # (item_key, name)
+        ("general_box",   "一般盒"),
+        ("pr_box",        "公關盒"),
+        ("general_piece", "一般片"),
+        ("pr_piece",      "公關片"),
+        ("bag",           "包裝材"),
+    ]
+
+    for item_key, name in mask_items:
+        existing = MaskInventory.query.filter_by(item_key=item_key).first()
+        if existing:
+            print(f"  - MaskInventory [{item_key}] 已存在，略過。")
+            continue
+        inv = MaskInventory(
+            item_key=item_key,
+            name=name,
+            qty_on_hand=0,   # 初始庫存 0，後續由補貨入帳
+        )
+        db.session.add(inv)
+        print(f"  - 建立 MaskInventory [{item_key}]（{name}）qty_on_hand=0")
+
+    db.session.commit()
+
+
 def main():
     app = create_app()
     with app.app_context():
@@ -199,6 +230,9 @@ def main():
         print("\n[耗材庫存]")
         seed_consumables()
 
+        print("\n[面膜庫存]")
+        seed_mask_inventory()
+
         print("\n種子資料完成。")
         print("=" * 50)
 
@@ -216,6 +250,7 @@ def main():
             (ConsumablePurchase,  "consumable_purchases（補耗材記錄）"),
             (ServiceRecord,       "service_records（施作記錄）"),
             (ServiceConsumable,   "service_consumables（施作耗材明細）"),
+            (MaskInventory,       "mask_inventory（面膜庫存）"),
         ]:
             count = model.query.count()
             print(f"  - {label}: {count} 筆")

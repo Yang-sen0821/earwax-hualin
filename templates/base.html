@@ -127,6 +127,30 @@
                             </ul>
                         </li>
 
+                        {# 面膜模組（獨立代理產品，獨立核算）#}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-flower1 me-1"></i>面膜
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
+                                <li><a class="dropdown-item" href="/mask/sales/new">
+                                    <i class="bi bi-plus-circle me-2 text-muted"></i>面膜KEY單
+                                </a></li>
+                                {% if session.user.role == 'owner' %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/mask">
+                                    <i class="bi bi-graph-up-arrow me-2 text-muted"></i>面膜後台
+                                </a></li>
+                                <li><a class="dropdown-item" href="/mask/cost">
+                                    <i class="bi bi-receipt me-2 text-muted"></i>面膜成本
+                                </a></li>
+                                <li><a class="dropdown-item" href="/mask/inventory">
+                                    <i class="bi bi-box-seam me-2 text-muted"></i>面膜庫存
+                                </a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+
                         {# 使用者資訊與登出 #}
                         <li class="nav-item d-flex align-items-center ms-lg-2">
                             <span class="text-muted small me-2">
