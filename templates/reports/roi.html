@@ -22,7 +22,34 @@
   .bar-fill { height:100%; background:linear-gradient(90deg,#c9a86a,var(--fc)); border-radius:999px; transition:width .3s; }
   .bar-fill.done { background:linear-gradient(90deg,#66bb6a,#2e7d32); }
   .payback-done-banner { background:#eaf6ea; border:1px solid #a5d6a5; color:#2e7d32; font-weight:700; font-size:18px; padding:14px 18px; border-radius:12px; margin-top:14px; }
+  /* 成本支出編輯（報表頁可編輯，收入/庫存維持唯讀） */
+  .flash-wrap { margin:0 0 16px; display:flex; flex-direction:column; gap:8px; max-width:620px; }
+  .flash { padding:10px 14px; border-radius:8px; font-size:14px; border:1px solid; }
+  .flash-ok { background:#eef7ee; border-color:#bcd9bc; color:#2f6b2f; }
+  .flash-error { background:#fbeeee; border-color:#e0bcbc; color:#9a2b2b; }
+  .flash-message { background:#eef2f7; border-color:#c2cdd9; color:#33506b; }
+  .edit-form { display:inline-flex; gap:6px; align-items:center; margin:0; }
+  .edit-form input[type=number], .edit-form input[type=text] {
+    padding:5px 8px; border:1px solid var(--line); border-radius:7px; font-size:14px; font-family:inherit; }
+  .edit-form input.amt { width:120px; text-align:right; }
+  .edit-form input.nm { width:160px; }
+  .btn-sm { cursor:pointer; border:1px solid var(--line); background:#fff; color:var(--fc);
+    padding:5px 10px; border-radius:7px; font-size:13px; }
+  .btn-sm.primary { background:var(--fc); color:#fff; border-color:var(--fc); }
+  .btn-sm.danger { color:#9a2b2b; border-color:#e0bcbc; }
+  .lock { color:#8a8378; font-size:12px; }
+  .editbox { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; max-width:760px; margin:8px 0 24px; }
+  .editbox h4 { margin:0 0 10px; font-size:15px; }
+  .editbox table { max-width:none; margin:0; }
 </style>
+
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% if msgs %}
+    <div class="flash-wrap">
+      {% for cat, m in msgs %}<div class="flash flash-{{ cat }}">{{ m }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
 
 <h2 style="margin-top:0;">成本與利潤（投報率 / ROI）</h2>
 <p class="formula">
@@ -49,27 +76,127 @@
 </table>
 
 <h3 style="margin-top:28px;">成本明細（總投入成本）</h3>
+<p class="muted" style="font-size:13px;margin:4px 0 12px;">
+  以下「成本／支出」可直接編輯，存檔後立即重算 ROI／回本／毛利／淨利。
+  收入、已售數量、庫存量一律來自訂單／庫存，維持唯讀自動，本頁不提供修改入口。
+</p>
 <table>
   <tbody>
-    <tr class="sub"><td>商品成本</td><td class="num">${{ '%.2f'|format(roi.product_cost) }}</td></tr>
-    <tr class="sub"><td>包材成本</td><td class="num">${{ '%.2f'|format(roi.packaging_cost) }}</td></tr>
-    <tr class="sub"><td>行銷成本</td><td class="num">${{ '%.2f'|format(roi.marketing_cost) }}</td></tr>
-    <tr class="sub"><td>建檔額外支出<br><span class="muted" style="font-size:12px;">PIF / 貼紙小卡 / 紙袋加價 / 外盒加價 / 版模費 等</span></td><td class="num">${{ '%.2f'|format(roi.extra_expense) }}</td></tr>
-    <tr class="sub"><td>其他支出（其他分錄）</td><td class="num">${{ '%.2f'|format(roi.other_expense) }}</td></tr>
+    <tr class="sub">
+      <td>商品成本</td>
+      <td class="num">
+        {% if roi.product_overridden %}
+          ${{ '%.2f'|format(roi.product_cost) }} <span class="lock">（由分錄 product_cost 鎖定，設定值不生效）</span>
+        {% else %}
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_cost_update') }}" style="justify-content:flex-end;">
+            <input type="hidden" name="kind" value="product">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="value" value="{{ '%.2f'|format(cost_settings.product) }}">
+            <button class="btn-sm primary" type="submit">存</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    <tr class="sub">
+      <td>包材成本</td>
+      <td class="num">
+        {% if roi.packaging_overridden %}
+          ${{ '%.2f'|format(roi.packaging_cost) }} <span class="lock">（由分錄 packaging 鎖定，設定值不生效）</span>
+        {% else %}
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_cost_update') }}" style="justify-content:flex-end;">
+            <input type="hidden" name="kind" value="packaging">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="value" value="{{ '%.2f'|format(cost_settings.packaging) }}">
+            <button class="btn-sm primary" type="submit">存</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    <tr class="sub">
+      <td>行銷成本</td>
+      <td class="num">
+        {% if roi.marketing_overridden %}
+          ${{ '%.2f'|format(roi.marketing_cost) }} <span class="lock">（由分錄 marketing 鎖定，設定值不生效）</span>
+        {% else %}
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_cost_update') }}" style="justify-content:flex-end;">
+            <input type="hidden" name="kind" value="marketing">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="value" value="{{ '%.2f'|format(cost_settings.marketing) }}">
+            <button class="btn-sm primary" type="submit">存</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    <tr class="sub"><td>建檔額外支出<br><span class="muted" style="font-size:12px;">PIF / 貼紙小卡 / 紙袋加價 / 外盒加價 / 版模費 等（明細見下方）</span></td><td class="num">${{ '%.2f'|format(roi.extra_expense) }}</td></tr>
+    <tr class="sub"><td>其他支出（其他分錄）<br><span class="muted" style="font-size:12px;">明細見下方</span></td><td class="num">${{ '%.2f'|format(roi.other_expense) }}</td></tr>
     <tr class="total"><td>總投入成本</td><td class="num">${{ '%.2f'|format(roi.total_cost) }}</td></tr>
   </tbody>
 </table>
 
-{% if roi.other_entries %}
-<h3 style="margin-top:28px;">其他分錄明細</h3>
-<table>
-  <tbody>
-    {% for k, v in roi.other_entries.items() %}
-    <tr><td>{{ k }}</td><td class="num">${{ '%.2f'|format(v) }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
+<div class="editbox">
+  <h4>建檔額外支出（extra_expenses）— 可新增 / 編輯 / 刪除</h4>
+  <table>
+    <tbody>
+      {% for e in extras %}
+      <tr>
+        <td>
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_extra_update', eid=e.id) }}">
+            <input class="nm" type="text" name="name" value="{{ e.name }}">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="amount" value="{{ '%.2f'|format(e.amount|float) }}">
+            <button class="btn-sm primary" type="submit">存</button>
+          </form>
+        </td>
+        <td>
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_extra_delete', eid=e.id) }}" onsubmit="return confirm('刪除這筆建檔額外支出？');">
+            <button class="btn-sm danger" type="submit">刪除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td colspan="2">
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_extra_add') }}">
+            <input class="nm" type="text" name="name" placeholder="項目名稱（如 PIF）">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="amount" placeholder="金額">
+            <button class="btn-sm primary" type="submit">＋ 新增</button>
+          </form>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="editbox">
+  <h4>其他支出（financial_entries，非收入/成本主類）— 可新增 / 編輯 / 刪除</h4>
+  <table>
+    <tbody>
+      {% for f in other_entries_rows %}
+      <tr>
+        <td>
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_other_update', fid=f.id) }}">
+            <input class="nm" type="text" name="entry_type" value="{{ f.entry_type }}">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="amount" value="{{ '%.2f'|format(f.amount|float) }}">
+            <input class="nm" type="text" name="description" value="{{ f.description or '' }}" placeholder="說明">
+            <button class="btn-sm primary" type="submit">存</button>
+          </form>
+        </td>
+        <td>
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_other_delete', fid=f.id) }}" onsubmit="return confirm('刪除這筆其他支出分錄？');">
+            <button class="btn-sm danger" type="submit">刪除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td colspan="2">
+          <form class="edit-form" method="post" action="{{ url_for('reports.roi_other_add') }}">
+            <input class="nm" type="text" name="entry_type" placeholder="類型（如 other / shipping）">
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="amount" placeholder="金額">
+            <input class="nm" type="text" name="description" placeholder="說明（選填）">
+            <button class="btn-sm primary" type="submit">＋ 新增</button>
+          </form>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 <h3 style="margin-top:28px;">利潤與投報率</h3>
 <table>
