@@ -12,7 +12,8 @@
     header { background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
     .nav { max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:4px;
            padding:10px 16px; flex-wrap:wrap; }
-    .brand { font-weight:700; color:var(--fc); margin-right:16px; font-size:18px; }
+    .nav a.brand { font-weight:700; color:var(--fc); margin-right:16px; font-size:18px; text-decoration:none; padding:8px 0; border-radius:0; }
+    .nav a.brand:hover { background:none; opacity:.8; }
     .nav a { text-decoration:none; color:var(--ink); padding:8px 12px; border-radius:8px; font-size:15px; }
     .nav a:hover { background:var(--bg); }
     .nav a.active { background:var(--fc); color:#fff; }
@@ -33,7 +34,7 @@
 <body>
   <header>
     <nav class="nav">
-      <span class="brand">Flora Court</span>
+      <a href="/" class="brand">Flora Court</a>
       <a href="/products"  class="{{ 'active' if section=='products' }}">商品</a>
       <a href="/inventory" class="{{ 'active' if section=='inventory' }}">庫存</a>
       <a href="/orders"    class="{{ 'active' if section=='orders' }}">訂單</a>

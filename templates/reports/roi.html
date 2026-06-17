@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}成本與利潤（投報率 ROI）— Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  .roi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin:8px 0 24px; }
+  .kpi { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .kpi .v { font-size:26px; font-weight:700; color:var(--fc); }
+  .kpi .l { color:#8a8378; font-size:14px; margin-top:4px; }
+  .kpi.bad .v { color:#a33; }
+  table { width:100%; max-width:620px; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th,td { padding:12px 16px; border-bottom:1px solid var(--line); font-size:15px; text-align:left; }
+  td.num,th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.sub td { color:#8a8378; }
+  tr.total td { font-weight:700; background:var(--bg); }
+  tr.result td { font-weight:700; font-size:16px; background:var(--bg); color:var(--fc); }
+  .formula { color:#8a8378; font-size:14px; margin:8px 0 20px; line-height:1.7; }
+</style>
+
+<h2 style="margin-top:0;">成本與利潤（投報率 / ROI）</h2>
+<p class="formula">
+  淨利 = 總收入 − 總投入成本　｜　毛利 = 總收入 − 商品成本<br>
+  投報率 ROI% = 淨利 ÷ 總投入成本 × 100%<br>
+  收入口徑：{{ roi.revenue_basis }}　｜　成本來源：financial_entries 分錄（無則退回 settings 測試值）＋ extra_expenses 建檔額外支出
+</p>
+
+<div class="roi-grid">
+  <div class="kpi"><div class="v">${{ '%.0f'|format(roi.total_revenue) }}</div><div class="l">累積總收入</div></div>
+  <div class="kpi"><div class="v">${{ '%.0f'|format(roi.total_cost) }}</div><div class="l">總投入成本</div></div>
+  <div class="kpi {{ 'bad' if roi.net_profit < 0 }}"><div class="v">${{ '%.0f'|format(roi.net_profit) }}</div><div class="l">淨利</div></div>
+  <div class="kpi {{ 'bad' if roi.roi_pct is not none and roi.roi_pct < 0 }}">
+    <div class="v">{% if roi.roi_pct is none %}N/A{% else %}{{ '%.1f'|format(roi.roi_pct) }}%{% endif %}</div>
+    <div class="l">投報率 ROI</div>
+  </div>
+</div>
+
+<h3 style="margin-top:8px;">收入</h3>
+<table>
+  <tbody>
+    <tr class="result"><td>累積總收入</td><td class="num">${{ '%.2f'|format(roi.total_revenue) }}</td></tr>
+  </tbody>
+</table>
+
+<h3 style="margin-top:28px;">成本明細（總投入成本）</h3>
+<table>
+  <tbody>
+    <tr class="sub"><td>商品成本</td><td class="num">${{ '%.2f'|format(roi.product_cost) }}</td></tr>
+    <tr class="sub"><td>包材成本</td><td class="num">${{ '%.2f'|format(roi.packaging_cost) }}</td></tr>
+    <tr class="sub"><td>行銷成本</td><td class="num">${{ '%.2f'|format(roi.marketing_cost) }}</td></tr>
+    <tr class="sub"><td>建檔額外支出<br><span class="muted" style="font-size:12px;">PIF / 貼紙小卡 / 紙袋加價 / 外盒加價 / 版模費 等</span></td><td class="num">${{ '%.2f'|format(roi.extra_expense) }}</td></tr>
+    <tr class="sub"><td>其他支出（其他分錄）</td><td class="num">${{ '%.2f'|format(roi.other_expense) }}</td></tr>
+    <tr class="total"><td>總投入成本</td><td class="num">${{ '%.2f'|format(roi.total_cost) }}</td></tr>
+  </tbody>
+</table>
+
+{% if roi.other_entries %}
+<h3 style="margin-top:28px;">其他分錄明細</h3>
+<table>
+  <tbody>
+    {% for k, v in roi.other_entries.items() %}
+    <tr><td>{{ k }}</td><td class="num">${{ '%.2f'|format(v) }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h3 style="margin-top:28px;">利潤與投報率</h3>
+<table>
+  <tbody>
+    <tr><td>總收入</td><td class="num">${{ '%.2f'|format(roi.total_revenue) }}</td></tr>
+    <tr class="sub"><td>　− 商品成本</td><td class="num">${{ '%.2f'|format(roi.product_cost) }}</td></tr>
+    <tr class="result"><td>毛利</td><td class="num">${{ '%.2f'|format(roi.gross_profit) }}</td></tr>
+    <tr class="sub"><td>　− 總投入成本</td><td class="num">${{ '%.2f'|format(roi.total_cost) }}</td></tr>
+    <tr class="result"><td>淨利</td><td class="num">${{ '%.2f'|format(roi.net_profit) }}</td></tr>
+    <tr class="result"><td>投報率 ROI%</td><td class="num">{% if roi.roi_pct is none %}N/A（總成本為 0）{% else %}{{ '%.2f'|format(roi.roi_pct) }}%{% endif %}</td></tr>
+  </tbody>
+</table>
+
+<p class="muted" style="margin-top:20px;">本頁為財務機密，限 owner / accounting 檢視。所有數字唯讀聚合，不變動任何資料。</p>
+{% endblock %}

@@ -15,12 +15,12 @@ from decimal import Decimal
 from flask import Blueprint, render_template, request, send_file
 from sqlalchemy import func
 
-from auth import login_required
+from auth import login_required, role_required
 from db import (
     get_session,
     Order, OrderItem, Product, SalesPlan, Customer,
     InventoryBalance, InventoryMovement,
-    FinancialEntry, ExtraExpense,
+    FinancialEntry, ExtraExpense, Setting,
     COMBO_CODES,
 )
 
@@ -225,6 +225,105 @@ def _financial_report(db):
 
 
 # =========================================================================
+# 共用：成本與利潤（投報率 ROI）— 限 owner / accounting
+# =========================================================================
+def _setting_float(db, key):
+    """讀 settings 數值型測試值（§七：成本先用測試值，後台可改）。查無/非數值回 0。"""
+    s = db.query(Setting).filter_by(key=key).first()
+    if not s or s.value is None:
+        return 0.0
+    try:
+        return float(s.value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _roi_report(db):
+    """成本與利潤（投報率 ROI）聚合，唯讀。
+
+    累積總收入口徑：
+      - 優先採 financial_entries 的 sale 分錄加總；
+      - 若無 sale 分錄，則以「已認列營收」訂單為準＝orders 中
+        payment_status='paid' 或 shipping_status ∈ (shipped, delivered) 的 total_amount 加總
+        （排除未付款且未出貨的草稿/待處理單）。
+
+    成本各項口徑（成本＝分錄優先，無分錄時退回 settings 測試值；§七）：
+      - 商品成本 product_cost ：financial_entries(product_cost) 或 settings.cost_product_test
+      - 包材成本 packaging     ：financial_entries(packaging)   或 settings.cost_packaging_test
+      - 行銷成本 marketing     ：financial_entries(marketing)   或 settings.cost_marketing_test
+      - 建檔額外支出 extra     ：extra_expenses 全部加總（PIF/貼紙小卡/紙袋加價/外盒加價/版模費等）
+      - 其他支出 other_entries ：financial_entries 中上述四類以外的分錄加總
+      總投入成本 ＝ 商品 + 包材 + 行銷 + 建檔額外支出 + 其他
+
+    淨利 ＝ 總收入 − 總投入成本
+    毛利 ＝ 總收入 − 商品成本
+    ROI% ＝ 淨利 ÷ 總投入成本 × 100（總成本為 0 時回 None → 前台顯示 N/A，不除以零）
+    """
+    fe_rows = (
+        db.query(
+            FinancialEntry.entry_type,
+            func.coalesce(func.sum(FinancialEntry.amount), 0),
+        )
+        .group_by(FinancialEntry.entry_type)
+        .all()
+    )
+    fe = {etype: _to_float(amt) for etype, amt in fe_rows}
+
+    # ---- 累積總收入 ----
+    sale_entries = fe.get("sale", 0.0)
+    recognized_orders_total = _to_float(
+        db.query(func.coalesce(func.sum(Order.total_amount), 0))
+        .filter(
+            (Order.payment_status == "paid")
+            | (Order.shipping_status.in_(("shipped", "delivered")))
+        )
+        .scalar()
+    )
+    if sale_entries > 0:
+        total_revenue = sale_entries
+        revenue_basis = "financial_entries(sale)"
+    else:
+        total_revenue = recognized_orders_total
+        revenue_basis = "orders(已付款/已出貨)"
+
+    # ---- 成本各項（分錄優先，無則退回 settings 測試值）----
+    product_cost = fe.get("product_cost", 0.0) or _setting_float(db, "cost_product_test")
+    packaging_cost = fe.get("packaging", 0.0) or _setting_float(db, "cost_packaging_test")
+    marketing_cost = fe.get("marketing", 0.0) or _setting_float(db, "cost_marketing_test")
+
+    extra_expense = _to_float(
+        db.query(func.coalesce(func.sum(ExtraExpense.amount), 0)).scalar()
+    )
+
+    known = ("sale", "product_cost", "packaging", "marketing")
+    other_entries = {k: v for k, v in fe.items() if k not in known}
+    other_expense = sum(other_entries.values())
+
+    total_cost = product_cost + packaging_cost + marketing_cost + extra_expense + other_expense
+
+    gross_profit = total_revenue - product_cost
+    net_profit = total_revenue - total_cost
+    roi_pct = (net_profit / total_cost * 100) if total_cost > 0 else None
+
+    return {
+        "total_revenue": total_revenue,
+        "revenue_basis": revenue_basis,
+        "sale_entries": sale_entries,
+        "recognized_orders_total": recognized_orders_total,
+        "product_cost": product_cost,
+        "packaging_cost": packaging_cost,
+        "marketing_cost": marketing_cost,
+        "extra_expense": extra_expense,
+        "other_expense": other_expense,
+        "other_entries": other_entries,
+        "total_cost": total_cost,
+        "gross_profit": gross_profit,
+        "net_profit": net_profit,
+        "roi_pct": roi_pct,
+    }
+
+
+# =========================================================================
 # 頁面：報表首頁（彙整入口 + 簡要 KPI）
 # =========================================================================
 @reports_bp.route("/")
@@ -284,6 +383,17 @@ def finance():
     db = get_session()
     fin = _financial_report(db)
     return render_template("reports/finance.html", section="reports", fin=fin)
+
+
+# =========================================================================
+# 頁面：成本與利潤（投報率 ROI）— 財務機密，限 owner / accounting
+# =========================================================================
+@reports_bp.route("/roi")
+@role_required("owner", "accounting")
+def roi():
+    db = get_session()
+    roi_data = _roi_report(db)
+    return render_template("reports/roi.html", section="reports", roi=roi_data)
 
 
 # =========================================================================
