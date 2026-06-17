@@ -305,6 +305,18 @@ def _roi_report(db):
     net_profit = total_revenue - total_cost
     roi_pct = (net_profit / total_cost * 100) if total_cost > 0 else None
 
+    # ---- 回本計算（沿用既有「總投入成本」與「累積收入」口徑，不重算）----
+    # 回本門檻 = 總投入成本；已回收 = 累積收入
+    # 回本進度% = 累積收入 ÷ 總投入成本 × 100（總成本 0 → None → 前台 N/A，防除零）
+    # 尚需回收 = max(0, 總投入成本 − 累積收入)
+    # 累積收入 ≥ 總投入成本 → 已回本，淨賺 = 累積收入 − 總投入成本
+    payback_threshold = total_cost          # 回本門檻
+    recovered = total_revenue               # 已回收
+    payback_pct = (recovered / total_cost * 100) if total_cost > 0 else None
+    remaining_to_recover = max(0.0, total_cost - total_revenue)
+    paid_back = (total_cost > 0) and (total_revenue >= total_cost)
+    net_earned = (total_revenue - total_cost) if paid_back else 0.0
+
     return {
         "total_revenue": total_revenue,
         "revenue_basis": revenue_basis,
@@ -320,6 +332,13 @@ def _roi_report(db):
         "gross_profit": gross_profit,
         "net_profit": net_profit,
         "roi_pct": roi_pct,
+        # ---- 回本計算 ----
+        "payback_threshold": payback_threshold,
+        "recovered": recovered,
+        "payback_pct": payback_pct,
+        "remaining_to_recover": remaining_to_recover,
+        "paid_back": paid_back,
+        "net_earned": net_earned,
     }
 
 

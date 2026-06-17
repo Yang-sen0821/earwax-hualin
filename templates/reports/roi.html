@@ -14,6 +14,14 @@
   tr.total td { font-weight:700; background:var(--bg); }
   tr.result td { font-weight:700; font-size:16px; background:var(--bg); color:var(--fc); }
   .formula { color:#8a8378; font-size:14px; margin:8px 0 20px; line-height:1.7; }
+  .payback-card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; max-width:620px; margin:8px 0 24px; }
+  .payback-big { font-size:40px; font-weight:800; color:var(--fc); line-height:1.1; }
+  .payback-big.done { color:#2e7d32; }
+  .payback-sub { color:#8a8378; font-size:15px; margin-top:6px; }
+  .bar-track { height:22px; background:var(--bg); border:1px solid var(--line); border-radius:999px; overflow:hidden; margin:18px 0 10px; }
+  .bar-fill { height:100%; background:linear-gradient(90deg,#c9a86a,var(--fc)); border-radius:999px; transition:width .3s; }
+  .bar-fill.done { background:linear-gradient(90deg,#66bb6a,#2e7d32); }
+  .payback-done-banner { background:#eaf6ea; border:1px solid #a5d6a5; color:#2e7d32; font-weight:700; font-size:18px; padding:14px 18px; border-radius:12px; margin-top:14px; }
 </style>
 
 <h2 style="margin-top:0;">成本與利潤（投報率 / ROI）</h2>
@@ -72,6 +80,44 @@
     <tr class="sub"><td>　− 總投入成本</td><td class="num">${{ '%.2f'|format(roi.total_cost) }}</td></tr>
     <tr class="result"><td>淨利</td><td class="num">${{ '%.2f'|format(roi.net_profit) }}</td></tr>
     <tr class="result"><td>投報率 ROI%</td><td class="num">{% if roi.roi_pct is none %}N/A（總成本為 0）{% else %}{{ '%.2f'|format(roi.roi_pct) }}%{% endif %}</td></tr>
+  </tbody>
+</table>
+
+<h3 style="margin-top:28px;">回本計算</h3>
+<p class="formula">
+  回本門檻 = 總投入成本　｜　已回收 = 累積收入（沿用上方 ROI 同口徑）<br>
+  回本進度% = 累積收入 ÷ 總投入成本 × 100%　｜　尚需回收 = 總投入成本 − 累積收入
+</p>
+
+<div class="payback-card">
+  {% if roi.payback_pct is none %}
+    <div class="payback-big">N/A</div>
+    <div class="payback-sub">總投入成本為 0，無法計算回本進度。</div>
+  {% else %}
+    <div class="payback-big {{ 'done' if roi.paid_back }}">{{ '%.1f'|format(roi.payback_pct) }}%</div>
+    <div class="payback-sub">回本進度（已回收 ${{ '%.0f'|format(roi.recovered) }} ／ 回本門檻 ${{ '%.0f'|format(roi.payback_threshold) }}）</div>
+
+    {# 進度條寬度上限 100%，避免超過門檻時撐破版面 #}
+    {% set bar_w = 100 if roi.payback_pct > 100 else roi.payback_pct %}
+    <div class="bar-track">
+      <div class="bar-fill {{ 'done' if roi.paid_back }}" style="width:{{ '%.1f'|format(bar_w) }}%;"></div>
+    </div>
+
+    {% if roi.paid_back %}
+      <div class="payback-done-banner">✅ 已回本！已淨賺 ${{ '%.0f'|format(roi.net_earned) }}</div>
+    {% else %}
+      <div class="payback-sub">尚未回本，還差 <strong style="color:#a33;">${{ '%.0f'|format(roi.remaining_to_recover) }}</strong> 即可回本。</div>
+    {% endif %}
+  {% endif %}
+</div>
+
+<table>
+  <tbody>
+    <tr class="sub"><td>回本門檻（總投入成本）</td><td class="num">${{ '%.2f'|format(roi.payback_threshold) }}</td></tr>
+    <tr class="sub"><td>已回收（累積收入）</td><td class="num">${{ '%.2f'|format(roi.recovered) }}</td></tr>
+    <tr><td>回本進度%</td><td class="num">{% if roi.payback_pct is none %}N/A（總成本為 0）{% else %}{{ '%.2f'|format(roi.payback_pct) }}%{% endif %}</td></tr>
+    <tr><td>尚需回收</td><td class="num">${{ '%.2f'|format(roi.remaining_to_recover) }}</td></tr>
+    <tr class="result"><td>回本狀態</td><td class="num">{% if roi.payback_pct is none %}N/A{% elif roi.paid_back %}✅ 已回本（淨賺 ${{ '%.2f'|format(roi.net_earned) }}）{% else %}未回本{% endif %}</td></tr>
   </tbody>
 </table>
 
