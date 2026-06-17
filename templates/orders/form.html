@@ -66,14 +66,14 @@
 
 <script>
   var PRODUCTS = [{% for p in products %}{id:{{ p.id }}, name:{{ p.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
-  var COMBOS = [{% for c in combo_codes %}{{ c|tojson }}{{ ',' if not loop.last }}{% endfor %}];
+  var COMBOS = [{% for c in combo_codes %}{code:{{ c|tojson }}, name:{{ (c|combo_label)|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
 
   function addRow() {
     var tb = document.getElementById('items-body');
     var tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--line)';
     var prodOpts = PRODUCTS.map(function(p){return '<option value="'+p.id+'">'+p.name+'</option>';}).join('');
-    var comboOpts = COMBOS.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+    var comboOpts = COMBOS.map(function(c){return '<option value="'+c.code+'">'+c.name+'</option>';}).join('');
     tr.innerHTML =
       '<td style="padding:6px;"><select name="item_product_id" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;">'+prodOpts+'</select></td>'+
       '<td style="padding:6px;"><select name="item_combo_code" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;">'+comboOpts+'</select></td>'+

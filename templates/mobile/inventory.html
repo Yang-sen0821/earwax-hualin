@@ -2,14 +2,12 @@
 {% block title %}庫存摘要{% endblock %}
 {% block heading %}庫存摘要{% endblock %}
 {% set active_tab = 'inventory' %}
-{% set pool_label = {'boxed':'盒裝 boxed','loose_piece':'裸片 loose_piece','paper_bag':'紙袋 paper_bag'} %}
-{% set cat_label = {'normal':'正常','reserved':'預留','pr':'公關','trial':'試用','scrap':'損耗報廢'} %}
 {% block content %}
   {% for pool in pool_order %}
     {% set bucket = pools.get(pool) %}
     <div class="card">
       <div class="pool-total">
-        <h3 style="margin:0">{{ pool_label.get(pool, pool) }}</h3>
+        <h3 style="margin:0">{{ pool | pool_label }}</h3>
         <span class="big">{{ bucket.total if bucket else 0 }}</span>
       </div>
       {% if bucket and bucket.rows %}
@@ -17,7 +15,7 @@
         <div class="row">
           <div class="grow">
             <div class="ttl2">{{ prod_map.get(r.product_id, '#' ~ r.product_id) }}</div>
-            <div class="sub">{{ cat_label.get(r.stock_category, r.stock_category) }}</div>
+            <div class="sub">{{ r.stock_category | cat_label }}</div>
           </div>
           <div class="ttl2">{{ r.qty }} {{ r.unit or '' }}</div>
         </div>

@@ -3,10 +3,10 @@
 {% block heading %}訂單{% endblock %}
 {% set active_tab = 'orders' %}
 {% macro pay_badge(s) %}
-  <span class="badge {{ 'b-paid' if s=='paid' else 'b-unpaid' if s=='unpaid' else 'b-other' }}">{{ s }}</span>
+  <span class="badge {{ 'b-paid' if s=='paid' else 'b-unpaid' if s=='unpaid' else 'b-other' }}">{{ s | payment_label }}</span>
 {% endmacro %}
 {% macro ship_badge(s) %}
-  <span class="badge {{ 'b-shipped' if s=='shipped' else 'b-pending' if s=='pending' else 'b-other' }}">{{ s }}</span>
+  <span class="badge {{ 'b-shipped' if s=='shipped' else 'b-pending' if s=='pending' else 'b-other' }}">{{ s | shipping_label }}</span>
 {% endmacro %}
 {% block content %}
   <form class="filters" method="get" action="/m/orders">

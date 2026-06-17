@@ -80,10 +80,10 @@
     <tbody>
       {% for r in plan_rows %}
       <tr>
-        <td>{{ r.combo_code }}</td>
+        <td>{{ r.combo_code | combo_label }}</td>
         <td>{{ r.name }}</td>
         <td>{{ r.price }}</td>
-        <td>{{ r.pool or '—（本商品不扣此方案）' }}</td>
+        <td>{{ r.pool | pool_label if r.pool else '—（本商品不扣此方案）' }}</td>
         <td>{{ r.qty_per_unit if r.qty_per_unit is not none else '—' }}</td>
         <td>{{ r.unit or '—' }}</td>
         <td>{% if r.active %}<span class="tag tag-on">啟用</span>{% else %}<span class="tag tag-off">停用</span>{% endif %}</td>
@@ -102,7 +102,7 @@
     <thead><tr><th>庫存池</th><th>門檻數量</th></tr></thead>
     <tbody>
       {% for t in thresholds %}
-      <tr><td>{{ t.inventory_pool }}</td><td>{{ t.threshold_qty }}</td></tr>
+      <tr><td>{{ t.inventory_pool | pool_label }}</td><td>{{ t.threshold_qty }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -115,7 +115,7 @@
       <div class="field">
         <label>庫存池</label>
         <select name="inventory_pool" required>
-          {% for pool in pools %}<option value="{{ pool }}">{{ pool }}</option>{% endfor %}
+          {% for pool in pools %}<option value="{{ pool }}">{{ pool | pool_label }}</option>{% endfor %}
         </select>
       </div>
       <div class="field"><label>門檻數量</label><input type="number" name="threshold_qty" min="0" required></div>

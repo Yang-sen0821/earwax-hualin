@@ -26,6 +26,9 @@ from db import (
     FinancialEntry, ExtraExpense, Setting,
     COMBO_CODES,
 )
+from display_labels import (
+    combo_label, pool_label, payment_label, shipping_label, mtype_label,
+)
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
@@ -605,7 +608,10 @@ def expense_delete(eid):
 
 
 # =========================================================================
-# 匯出 Excel（D11）— 訂單 / 庫存 / 異動 / 銷售報表 四類
+# 匯出 Excel（D11）— 單一按鈕、一份 .xlsx、多工作表分頁。
+# 分頁：訂單 / 庫存 / 庫存異動 / 銷售報表（期間 + 排行）。
+# 內容全中文（沿用 display_labels 對照：狀態 / 組合 / 庫存池 / 異動類別）。
+# 權限：@login_required（沿用原匯出頁角色限制：viewer 以上可讀可匯）。
 # =========================================================================
 def _new_workbook():
     from openpyxl import Workbook
@@ -637,11 +643,8 @@ def _ts():
     return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
 
-@reports_bp.route("/export/orders.xlsx")
-@login_required
-def export_orders():
-    db = get_session()
-    wb, Font = _new_workbook()
+def _sheet_orders(wb, db, Font):
+    """工作表：訂單（首頁，沿用 wb.active，避免留空白 Sheet）。"""
     ws = wb.active
     ws.title = "訂單"
     _write_header(ws, [
@@ -657,41 +660,31 @@ def export_orders():
             o.recipient_phone or "",
             o.shipping_address or "",
             _to_float(o.total_amount),
-            o.payment_status,
-            o.shipping_status,
+            payment_label(o.payment_status),
+            shipping_label(o.shipping_status),
             o.note or "",
             o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
         ])
-    return _send_xlsx(wb, f"flora_court_orders_{_ts()}.xlsx")
 
 
-@reports_bp.route("/export/inventory.xlsx")
-@login_required
-def export_inventory():
-    db = get_session()
-    wb, Font = _new_workbook()
-    ws = wb.active
-    ws.title = "庫存"
+def _sheet_inventory(wb, db, Font):
+    """工作表：庫存。"""
+    ws = wb.create_sheet("庫存")
     _write_header(ws, [
-        "SKU", "商品", "庫存池", "目前(normal)", "預留(reserved)",
-        "公關品(pr)", "試用(trial)", "損耗(scrap)", "已售(累計)", "單位",
+        "SKU", "商品", "庫存池", "目前", "預留",
+        "公關品", "試用品", "損耗報廢", "已售(累計)", "單位",
     ], Font)
     for r in _inventory_report(db):
         ws.append([
-            r["sku"], r["product_name"], r["inventory_pool"],
+            r["sku"], r["product_name"], pool_label(r["inventory_pool"]),
             r["normal"], r["reserved"], r["pr"], r["trial"], r["scrap"],
             r["sold"], r["unit"] or "",
         ])
-    return _send_xlsx(wb, f"flora_court_inventory_{_ts()}.xlsx")
 
 
-@reports_bp.route("/export/movements.xlsx")
-@login_required
-def export_movements():
-    db = get_session()
-    wb, Font = _new_workbook()
-    ws = wb.active
-    ws.title = "庫存異動"
+def _sheet_movements(wb, db, Font):
+    """工作表：庫存異動。"""
+    ws = wb.create_sheet("庫存異動")
     _write_header(ws, [
         "異動ID", "SKU", "商品", "庫存池", "從分類", "到分類",
         "變動量", "變動前", "變動後", "異動類別", "來源類型", "來源ID",
@@ -704,13 +697,13 @@ def export_movements():
             m.movement_id,
             p.sku if p else "",
             p.name if p else f"#{m.product_id}",
-            m.inventory_pool,
+            pool_label(m.inventory_pool),
             m.stock_category_from or "",
             m.stock_category_to or "",
             m.qty_delta,
             m.qty_before,
             m.qty_after,
-            m.movement_type,
+            mtype_label(m.movement_type),
             m.ref_type or "",
             m.ref_id or "",
             m.movement_group_id or "",
@@ -719,31 +712,44 @@ def export_movements():
             m.note or "",
             m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
         ])
-    return _send_xlsx(wb, f"flora_court_movements_{_ts()}.xlsx")
 
 
-@reports_bp.route("/export/sales.xlsx")
+def _sheet_sales(wb, db, Font, granularity):
+    """工作表：銷售報表（期間銷售 + 商品銷售排行，合併同一分頁）。"""
+    ws = wb.create_sheet("銷售報表")
+    label = {"day": "日報", "month": "月報", "year": "年報"}[granularity]
+
+    # 區塊一：期間銷售
+    ws.append([f"期間銷售（{label}）"])
+    ws["A1"].font = Font(bold=True)
+    _write_header(ws, [f"期間（{label}）", "訂單數", "銷售金額"], Font)
+    for p in _sales_by_period(db, granularity):
+        ws.append([p["period"], p["order_count"], p["amount"]])
+
+    # 空一列後接區塊二：商品銷售排行
+    ws.append([])
+    title_row = ws.max_row + 1
+    ws.append(["商品銷售排行"])
+    ws[f"A{title_row}"].font = Font(bold=True)
+    _write_header(ws, ["組合代碼", "組合名稱", "明細筆數", "銷售組數", "銷售金額"], Font)
+    for r in _sales_ranking(db):
+        ws.append([r["combo_code"], combo_label(r["combo_code"]),
+                   r["line_count"], r["total_qty"], r["total_amount"]])
+
+
+@reports_bp.route("/export.xlsx")
 @login_required
-def export_sales():
+def export_all():
+    """單鍵匯出：一份 .xlsx，含訂單 / 庫存 / 庫存異動 / 銷售報表 四個工作表。"""
     db = get_session()
     granularity = request.args.get("g", "month")
     if granularity not in ("day", "month", "year"):
         granularity = "month"
+
     wb, Font = _new_workbook()
+    _sheet_orders(wb, db, Font)       # 首頁，用 wb.active（不留空白 Sheet）
+    _sheet_inventory(wb, db, Font)
+    _sheet_movements(wb, db, Font)
+    _sheet_sales(wb, db, Font, granularity)
 
-    # 工作表 1：期間銷售
-    ws1 = wb.active
-    ws1.title = "期間銷售"
-    label = {"day": "日報", "month": "月報", "year": "年報"}[granularity]
-    _write_header(ws1, [f"期間（{label}）", "訂單數", "銷售金額"], Font)
-    for p in _sales_by_period(db, granularity):
-        ws1.append([p["period"], p["order_count"], p["amount"]])
-
-    # 工作表 2：商品銷售排行
-    ws2 = wb.create_sheet("銷售排行")
-    _write_header(ws2, ["組合代碼", "組合名稱", "明細筆數", "銷售組數", "銷售金額"], Font)
-    for r in _sales_ranking(db):
-        ws2.append([r["combo_code"], r["combo_name"],
-                    r["line_count"], r["total_qty"], r["total_amount"]])
-
-    return _send_xlsx(wb, f"flora_court_sales_{granularity}_{_ts()}.xlsx")
+    return _send_xlsx(wb, f"flora_court_{_ts()}.xlsx")

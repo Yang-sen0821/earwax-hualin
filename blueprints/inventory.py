@@ -25,23 +25,10 @@ from db import (
     INVENTORY_POOLS, STOCK_CATEGORIES, MOVEMENT_TYPES,
 )
 import inventory_service as inv
+# 顯示用標籤：全站單一來源（display_labels）
+from display_labels import POOL_LABELS, CAT_LABELS, MTYPE_LABELS
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
-
-# 顯示用標籤
-POOL_LABELS = {"boxed": "盒裝", "loose_piece": "裸片", "paper_bag": "紙袋"}
-CAT_LABELS = {
-    "normal": "正常", "reserved": "預留", "pr": "公關品",
-    "trial": "試用品", "scrap": "損耗報廢",
-}
-MTYPE_LABELS = {
-    "PURCHASE": "採購入庫", "RESTOCK": "補貨入庫",
-    "SALE": "銷售", "GIFT": "贈品", "TRIAL": "試用", "PR": "公關",
-    "KOL_SAMPLE": "KOL樣品", "STAFF_USE": "員工使用", "INSTORE_USE": "店內使用",
-    "SCRAP_LOSS": "損耗", "SCRAP": "報廢",
-    "SPLIT_BOX": "拆盒", "RELEASE_RESERVE": "預留釋放", "PAPERBAG_OUT": "紙袋出貨",
-    "ADJUSTMENT": "盤點調整", "SEED": "初始建檔", "IMPORT": "歷史匯入",
-}
 # 出庫類（§4.6 通用出庫）
 OUT_TYPES = ["GIFT", "TRIAL", "PR", "KOL_SAMPLE", "STAFF_USE",
              "INSTORE_USE", "SCRAP_LOSS", "SCRAP"]

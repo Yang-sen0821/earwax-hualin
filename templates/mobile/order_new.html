@@ -40,7 +40,7 @@
           </select>
           <select name="combo_code">
             {% for cc in combo_codes %}
-            <option value="{{ cc }}">{{ cc }}</option>
+            <option value="{{ cc }}">{{ cc | combo_label }}</option>
             {% endfor %}
           </select>
           <input type="number" name="qty" min="1" inputmode="numeric" placeholder="0">
@@ -61,7 +61,7 @@
         {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
       </select>
       <select name="combo_code">
-        {% for cc in combo_codes %}<option value="{{ cc }}">{{ cc }}</option>{% endfor %}
+        {% for cc in combo_codes %}<option value="{{ cc }}">{{ cc | combo_label }}</option>{% endfor %}
       </select>
       <input type="number" name="qty" min="1" inputmode="numeric" placeholder="0">
     </div>

@@ -28,7 +28,7 @@
     <div class="row">
       <div class="grow">
         <div class="ttl2">{{ prod_map.get(it.product_id, '#' ~ it.product_id) }}</div>
-        <div class="sub">{{ it.combo_code }} × {{ it.qty }}</div>
+        <div class="sub">{{ it.combo_code | combo_label }} × {{ it.qty }}</div>
       </div>
       <div>${{ '%.0f'|format(it.subtotal or 0) }}</div>
     </div>

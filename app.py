@@ -13,6 +13,7 @@ from blueprints.orders import orders_bp
 from blueprints.customers import customers_bp
 from blueprints.reports import reports_bp
 from blueprints.mobile import mobile_bp
+from display_labels import register_display_helpers
 from db import SessionLocal
 
 
@@ -20,6 +21,9 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
+
+    # ---- 全站顯示中文化（共用對照：filter + context_processor）----
+    register_display_helpers(app)
 
     # ---- 註冊 blueprint（auth + 6 業務）----
     app.register_blueprint(auth_bp)

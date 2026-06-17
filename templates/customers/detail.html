@@ -89,8 +89,8 @@
       <tr style="border-bottom:1px solid var(--line);">
         <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:var(--fc);text-decoration:none;">{{ o.order_no }}</a></td>
         <td style="padding:8px;">{{ o.total_amount }}</td>
-        <td style="padding:8px;">{{ o.payment_status }}</td>
-        <td style="padding:8px;">{{ o.shipping_status }}</td>
+        <td style="padding:8px;">{{ o.payment_status | payment_label }}</td>
+        <td style="padding:8px;">{{ o.shipping_status | shipping_label }}</td>
       </tr>
       {% else %}
       <tr><td colspan="4" class="muted" style="padding:12px;text-align:center;">尚無訂單</td></tr>

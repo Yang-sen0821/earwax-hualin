@@ -13,7 +13,7 @@
 
 <div class="bar">
   <h2 style="margin:0;">庫存報表</h2>
-  <a class="exp" href="/reports/export/inventory.xlsx">匯出 Excel</a>
+  <a class="exp" href="/reports/export.xlsx">匯出 Excel</a>
 </div>
 <p class="muted">目前(normal) / 預留(reserved) / 公關品(pr) / 試用(trial) / 損耗(scrap)；「已售」為 SALE 異動累計，掛在各商品首列。</p>
 
@@ -28,7 +28,7 @@
     <tr>
       <td>{{ r.sku }}</td>
       <td>{{ r.product_name }}</td>
-      <td class="pool">{{ r.inventory_pool }}</td>
+      <td class="pool">{{ r.inventory_pool | pool_label }}</td>
       <td class="num">{{ r.normal }}</td>
       <td class="num">{{ r.reserved }}</td>
       <td class="num">{{ r.pr }}</td>

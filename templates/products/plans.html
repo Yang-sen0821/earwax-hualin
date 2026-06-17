@@ -15,7 +15,7 @@
 
 {% for r in rows %}
 <div class="sec">
-  <h2>{{ r.plan.combo_code }} — {{ r.plan.name }}
+  <h2>{{ r.plan.combo_code | combo_label }} — {{ r.plan.name }}
     {% if r.plan.active %}<span class="tag tag-on">啟用</span>{% else %}<span class="tag tag-off">停用</span>{% endif %}
   </h2>
   <p class="sub">售價：{{ r.plan.price }}</p>
@@ -27,7 +27,7 @@
       <tr>
         <td>{{ it.product_name }}</td>
         <td>{{ it.product_sku }}</td>
-        <td>{{ it.pool }}</td>
+        <td>{{ it.pool | pool_label }}</td>
         <td>{{ it.qty_per_unit }}</td>
         <td>{{ it.unit or '—' }}</td>
       </tr>
