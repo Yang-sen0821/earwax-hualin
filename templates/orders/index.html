@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}訂單管理 — Flora Court{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h2 style="margin:0;flex:1;">訂單管理</h2>
+    <a href="{{ url_for('orders.import_page') }}"
+       style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">歷史匯入</a>
+    <a href="{{ url_for('orders.new') }}"
+       style="background:var(--fc);color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;">+ 新增訂單</a>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div style="margin-top:12px;color:#a33;">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="get" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+    <input name="q" value="{{ q }}" placeholder="訂單編號 / 收件人 / 電話"
+           style="flex:1;min-width:160px;padding:8px;border:1px solid var(--line);border-radius:8px;">
+    <select name="payment_status" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <option value="">付款（全部）</option>
+      {% for s in payment_statuses %}<option value="{{ s }}" {{ 'selected' if f_pay==s }}>{{ s }}</option>{% endfor %}
+    </select>
+    <select name="shipping_status" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <option value="">出貨（全部）</option>
+      {% for s in shipping_statuses %}<option value="{{ s }}" {{ 'selected' if f_ship==s }}>{{ s }}</option>{% endfor %}
+    </select>
+    <button type="submit" style="padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">篩選</button>
+  </form>
+
+  <table style="width:100%;margin-top:16px;border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">訂單編號</th>
+        <th style="padding:8px;">客戶 / 收件人</th>
+        <th style="padding:8px;">金額</th>
+        <th style="padding:8px;">付款</th>
+        <th style="padding:8px;">出貨</th>
+        <th style="padding:8px;">建立時間</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:var(--fc);text-decoration:none;font-weight:600;">{{ o.order_no }}</a></td>
+        <td style="padding:8px;">
+          {% if o.customer_id and cust_map.get(o.customer_id) %}{{ cust_map[o.customer_id].name }}{% else %}{{ o.recipient_name or '—' }}{% endif %}
+        </td>
+        <td style="padding:8px;">{{ o.total_amount }}</td>
+        <td style="padding:8px;">{{ o.payment_status }}</td>
+        <td style="padding:8px;">{{ o.shipping_status }}</td>
+        <td style="padding:8px;" class="muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted" style="padding:16px;text-align:center;">尚無訂單</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

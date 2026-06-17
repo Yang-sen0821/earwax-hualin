@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}系統設定 — Flora Court{% endblock %}
+{% block content %}
+{% include "products/_style.html" %}
+{% include "products/_flash.html" %}
+
+<div class="pg-head">
+  <h1>系統設定</h1>
+  <a class="btn" href="{{ url_for('products.index') }}">← 回商品</a>
+</div>
+
+<div class="card">
+  <p class="sub">
+    財務測試值 / 紙袋每單扣減數 / 其他全域設定。
+    {% if can_edit_all %}你可編輯全部設定。
+    {% elif can_edit_finance %}你（會計）僅可編輯財務參數。
+    {% else %}唯讀（僅 owner / accounting 可編輯）。{% endif %}
+  </p>
+</div>
+
+<div class="sec">
+  <table class="tbl">
+    <thead>
+      <tr><th>鍵 (key)</th><th>說明</th><th>型別</th><th>值</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      {% set s = item.setting %}
+      <tr>
+        <td>
+          {{ s.key }}
+          {% if item.is_finance %}<span class="tag tag-pkg">財務</span>{% endif %}
+        </td>
+        <td class="sub">{{ s.description or '—' }}</td>
+        <td>{{ s.value_type }}</td>
+        <td>
+          {% if item.editable %}
+            <form class="inline-form" method="post" action="{{ url_for('products.settings_update') }}">
+              <input type="hidden" name="key" value="{{ s.key }}">
+              {% if s.value_type == 'bool' %}
+                <select name="value">
+                  <option value="true" {{ 'selected' if s.value == 'true' else '' }}>true</option>
+                  <option value="false" {{ 'selected' if s.value != 'true' else '' }}>false</option>
+                </select>
+              {% elif s.value_type in ('int', 'float') %}
+                <input type="number" name="value" value="{{ s.value }}" step="{{ '1' if s.value_type == 'int' else 'any' }}">
+              {% else %}
+                <input type="text" name="value" value="{{ s.value }}">
+              {% endif %}
+              <button type="submit" class="btn btn-sm btn-primary">儲存</button>
+            </form>
+          {% else %}
+            <strong>{{ s.value }}</strong> <span class="sub">（唯讀）</span>
+          {% endif %}
+        </td>
+        <td></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

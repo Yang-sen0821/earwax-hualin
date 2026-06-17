@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ '編輯客戶' if customer else '新增客戶' }} — Flora Court{% endblock %}
+{% block content %}
+{% macro field(name, label, value, required=False) %}
+  <label style="display:block;margin:12px 0 4px;">{{ label }}</label>
+  <input name="{{ name }}" value="{{ value }}" {% if required %}required{% endif %}
+         style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
+{% endmacro %}
+<div class="card" style="max-width:560px;">
+  <h2 style="margin-top:0;">{{ '編輯客戶' if customer else '新增客戶' }}</h2>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div style="color:#a33;margin-bottom:12px;">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post"
+        action="{{ url_for('customers.edit', customer_id=customer.id) if customer else url_for('customers.new') }}">
+    {{ field('name', '姓名（必填）', (customer.name if customer else form.get('name','')), required=True) }}
+    {{ field('phone', '電話', (customer.phone if customer else form.get('phone','')) or '') }}
+    {{ field('email', 'Email', (customer.email if customer else form.get('email','')) or '') }}
+
+    <label style="display:block;margin:12px 0 4px;">備註</label>
+    <textarea name="note" rows="3"
+              style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">{{ (customer.note if customer else form.get('note','')) or '' }}</textarea>
+
+    <div style="margin-top:20px;display:flex;gap:8px;">
+      <button type="submit" style="background:var(--fc);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">儲存</button>
+      <a href="{{ url_for('customers.detail', customer_id=customer.id) if customer else url_for('customers.index') }}"
+         style="padding:10px 20px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

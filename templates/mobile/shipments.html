@@ -1,0 +1,32 @@
+{% extends "mobile/_base.html" %}
+{% block title %}待出貨{% endblock %}
+{% block heading %}待出貨{% endblock %}
+{% set active_tab = 'shipments' %}
+{% block content %}
+  <div class="hint" style="margin-bottom:10px">出貨將於同一交易內扣紙袋（§4.4）；紙袋不足則整筆取消。</div>
+  {% if orders %}
+    {% for o in orders %}
+    <div class="card">
+      <div class="row" style="border:none;padding-top:0">
+        <div class="grow">
+          <div class="ttl2">{{ o.order_no }}</div>
+          <div class="sub">{{ o.recipient_name or '—' }}　{{ o.recipient_phone or '' }}</div>
+          <div class="sub">{{ o.shipping_address or '—' }}</div>
+        </div>
+        <a class="badge b-other" href="/m/orders/{{ o.id }}">明細</a>
+      </div>
+      <form method="post" action="/m/shipments/{{ o.id }}/ship">
+        <label>物流商（選填）</label>
+        <input type="text" name="carrier" autocomplete="off">
+        <label>追蹤碼（選填）</label>
+        <input type="text" name="tracking_no" autocomplete="off">
+        <div style="height:10px"></div>
+        <button class="btn btn-primary" type="submit"
+          onclick="return confirm('確認出貨 {{ o.order_no }}？將扣紙袋。')">確認出貨</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="card"><div class="empty">沒有待出貨的訂單</div></div>
+  {% endif %}
+{% endblock %}

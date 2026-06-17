@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "inventory/_macros.html" as ui %}
+{% block title %}盤點調整 — Flora Court{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:600px;">
+  {{ ui.subnav('adjust') }}
+  {{ ui.flashes() }}
+
+  <h2 style="margin-top:0;">手動調整 / 盤點</h2>
+  <p class="muted">調整單：原因（reason）必填，限 owner 核可（approve），走 ADJUSTMENT 異動，
+     含 qty_before / qty_after，禁直改庫存表。填入「盤點後目標數量」，系統自動算差額。</p>
+
+  <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+    <label>商品
+      <select name="product_id" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for p in products %}<option value="{{ p.id }}">{{ p.name }}（{{ p.sku }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>庫存池
+      <select name="inventory_pool" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for pool in pools %}<option value="{{ pool }}">{{ pool_labels[pool] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>分類
+      <select name="stock_category" style="width:100%; padding:8px; margin-top:4px;">
+        {% for c in cats %}<option value="{{ c }}" {% if c=='normal' %}selected{% endif %}>{{ cat_labels[c] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>盤點後目標數量
+      <input type="number" name="target_qty" min="0" required style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <label>調整原因（必填）
+      <input type="text" name="reason" required style="width:100%; padding:8px; margin-top:4px;"
+             placeholder="例：實盤差異 / 破損報廢盤盈虧">
+    </label>
+    <label>備註
+      <input type="text" name="note" style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:11px; border-radius:8px; font-size:15px; cursor:pointer;">確認調整（owner 核可）</button>
+  </form>
+
+  <h3 style="margin-top:28px;">目前庫存（參考）</h3>
+  <div style="overflow-x:auto;">
+  <table style="border-collapse:collapse; width:100%; font-size:13px; min-width:480px;">
+    <thead>
+      <tr style="background:#faf8f5;">
+        <th style="text-align:left; padding:6px 8px; border:1px solid #e5e0d8;">商品</th>
+        <th style="text-align:left; padding:6px 8px; border:1px solid #e5e0d8;">池</th>
+        <th style="text-align:left; padding:6px 8px; border:1px solid #e5e0d8;">分類</th>
+        <th style="text-align:right; padding:6px 8px; border:1px solid #e5e0d8;">數量</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in products %}
+        {% for pool in pools %}
+          {% for c in cats %}
+            {% set v = bal_map.get((p.id, pool, c)) %}
+            {% if v is not none %}
+            <tr>
+              <td style="padding:6px 8px; border:1px solid #e5e0d8;">{{ p.name }}</td>
+              <td style="padding:6px 8px; border:1px solid #e5e0d8;">{{ pool_labels[pool] }}</td>
+              <td style="padding:6px 8px; border:1px solid #e5e0d8;">{{ cat_labels[c] }}</td>
+              <td style="text-align:right; padding:6px 8px; border:1px solid #e5e0d8;">{{ v }}</td>
+            </tr>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

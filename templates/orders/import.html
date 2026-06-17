@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}歷史訂單匯入 — Flora Court{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h2 style="margin:0;flex:1;">歷史訂單匯入（D14）</h2>
+    <a href="{{ url_for('orders.index') }}" style="color:var(--fc);text-decoration:none;">← 返回訂單</a>
+  </div>
+  <p class="muted">歷史資料載入：只落地匯入表，<strong>不扣庫存、不動異動</strong>（歷史已發生）。
+    匯入檔（.xlsx / .csv）表頭可用中文名稱或欄位代碼。</p>
+
+  <form method="post" enctype="multipart/form-data" style="margin-top:16px;">
+    <div style="margin-bottom:12px;">
+      <label>批次名稱（選填）</label><br>
+      <input type="text" name="batch_name" placeholder="例：2025 上半年舊單" style="width:100%;max-width:360px;padding:8px;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label>檔案（.xlsx / .csv）</label><br>
+      <input type="file" name="file" accept=".xlsx,.xlsm,.csv,.txt" required>
+    </div>
+    <button type="submit" style="padding:8px 20px;background:var(--fc);color:#fff;border:none;border-radius:6px;cursor:pointer;">開始匯入</button>
+  </form>
+
+  <h3 style="margin-top:24px;">欄位對照</h3>
+  <table style="width:100%;margin-top:8px;border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">欄位代碼</th>
+        <th style="padding:8px;">中文名稱</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for code, label in import_fields %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px;font-family:monospace;">{{ code }}</td>
+        <td style="padding:8px;">{{ label }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if batches %}
+<div class="card" style="margin-top:16px;">
+  <h3 style="margin:0 0 12px;">匯入批次紀錄</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">#</th>
+        <th style="padding:8px;">批次</th>
+        <th style="padding:8px;">檔案</th>
+        <th style="padding:8px;">總列</th>
+        <th style="padding:8px;">成功</th>
+        <th style="padding:8px;">失敗</th>
+        <th style="padding:8px;">狀態</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in batches %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px;">{{ b.id }}</td>
+        <td style="padding:8px;"><a href="{{ url_for('orders.import_result', import_id=b.id) }}" style="color:var(--fc);">{{ b.batch_name }}</a></td>
+        <td style="padding:8px;">{{ b.source_file }}</td>
+        <td style="padding:8px;">{{ b.imported_rows }}</td>
+        <td style="padding:8px;">{{ b.success_rows }}</td>
+        <td style="padding:8px;">{{ b.failed_rows }}</td>
+        <td style="padding:8px;">{{ b.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

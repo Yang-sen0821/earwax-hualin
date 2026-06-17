@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ '編輯商品' if mode == 'edit' else '新增商品' }} — Flora Court{% endblock %}
+{% block content %}
+{% include "products/_style.html" %}
+{% include "products/_flash.html" %}
+
+<div class="pg-head">
+  <h1>{{ '編輯商品' if mode == 'edit' else '新增商品' }}</h1>
+  <a class="btn" href="{{ url_for('products.index') }}">← 回列表</a>
+</div>
+
+<div class="card">
+  <form method="post"
+        action="{{ url_for('products.edit', pid=product.id) if mode == 'edit' else url_for('products.create') }}">
+    <div class="grid2">
+      <div class="field">
+        <label>SKU{% if mode != 'edit' %}（必填，建立後不可改）{% endif %}</label>
+        {% if mode == 'edit' %}
+          <input type="text" value="{{ form.sku }}" disabled>
+        {% else %}
+          <input type="text" name="sku" value="{{ form.sku or '' }}" required>
+        {% endif %}
+      </div>
+      <div class="field">
+        <label>名稱（必填）</label>
+        <input type="text" name="name" value="{{ form.name or '' }}" required>
+      </div>
+      <div class="field">
+        <label>分類</label>
+        <input type="text" name="category" value="{{ form.category or '' }}" placeholder="面膜 / 保養品 / 包材">
+      </div>
+      <div class="field">
+        <label>圖片網址 (image_url)</label>
+        <input type="text" name="image_url" value="{{ form.image_url or '' }}" placeholder="https://...">
+      </div>
+    </div>
+    <div class="field">
+      <label>說明</label>
+      <textarea name="description">{{ form.description or '' }}</textarea>
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" name="active" {{ 'checked' if form.active or mode != 'edit' else '' }}> 上架（active）</label>
+    </div>
+    {% if mode != 'edit' %}
+    <div class="field">
+      <label class="check"><input type="checkbox" name="is_packaging"> 設為共用包材商品（sentinel）</label>
+      <span class="sub">一般面膜商品請勿勾選。</span>
+    </div>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">儲存</button>
+  </form>
+</div>
+{% endblock %}

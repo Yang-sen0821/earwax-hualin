@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "inventory/_macros.html" as ui %}
+{% block title %}拆盒調撥 — Flora Court{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:560px;">
+  {{ ui.subnav('split') }}
+  {{ ui.flashes() }}
+
+  <h2 style="margin-top:0;">拆盒調撥</h2>
+  <p class="muted">1 盒 → 5 片。原子交易內寫 2 筆 SPLIT_BOX 異動（盒 −N、片 +5N，同 group_id）。
+     不存在「扣了盒沒加片」中間態。</p>
+
+  <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+    <label>商品
+      <select name="product_id" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for p in products %}<option value="{{ p.id }}">{{ p.name }}（{{ p.sku }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>拆盒數（盒）
+      <input type="number" name="box_qty" min="1" required style="width:100%; padding:8px; margin-top:4px;"
+             oninput="document.getElementById('preview').textContent = this.value ? ('將產生 ' + (this.value*5) + ' 片') : '';">
+    </label>
+    <div id="preview" class="muted" style="font-size:13px;"></div>
+    <label>備註
+      <input type="text" name="note" style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:11px; border-radius:8px; font-size:15px; cursor:pointer;">確認拆盒</button>
+  </form>
+</div>
+{% endblock %}

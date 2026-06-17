@@ -1,0 +1,33 @@
+{% extends "mobile/_base.html" %}
+{% block title %}手機後台{% endblock %}
+{% block heading %}Flora Court 手機後台{% endblock %}
+{% block back %}<span class="back" style="opacity:0">‹</span>{% endblock %}
+{% set active_tab = 'home' %}
+{% block content %}
+  <div class="card">
+    <h3>高頻操作</h3>
+    <a class="itemlink" href="/m/orders/new">
+      <div class="row"><div class="grow"><div class="ttl2">＋ 快速建單</div>
+        <div class="sub">多品項，缺貨整張取消</div></div><span>›</span></div>
+    </a>
+    <a class="itemlink" href="/m/orders">
+      <div class="row"><div class="grow"><div class="ttl2">📋 訂單列表</div>
+        <div class="sub">查單、改付款 / 出貨狀態</div></div><span>›</span></div>
+    </a>
+    <a class="itemlink" href="/m/shipments">
+      <div class="row"><div class="grow"><div class="ttl2">🚚 待出貨</div>
+        <div class="sub">出貨並扣紙袋</div></div><span>›</span></div>
+    </a>
+    <a class="itemlink" href="/m/inventory">
+      <div class="row"><div class="grow"><div class="ttl2">📦 庫存摘要</div>
+        <div class="sub">盒裝 / 裸片 / 紙袋三池</div></div><span>›</span></div>
+    </a>
+    <a class="itemlink" href="/m/customers">
+      <div class="row"><div class="grow"><div class="ttl2">👤 客戶查詢</div>
+        <div class="sub">依姓名 / 電話搜尋</div></div><span>›</span></div>
+    </a>
+  </div>
+  <div class="card">
+    <a class="btn btn-ghost" href="/">回桌面後台</a>
+  </div>
+{% endblock %}

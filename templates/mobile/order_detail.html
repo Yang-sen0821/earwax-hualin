@@ -1,0 +1,63 @@
+{% extends "mobile/_base.html" %}
+{% block title %}{{ order.order_no }}{% endblock %}
+{% block heading %}{{ order.order_no }}{% endblock %}
+{% block back %}<a href="/m/orders" class="back">‹</a>{% endblock %}
+{% set active_tab = 'orders' %}
+{% block content %}
+  <div class="card">
+    <h3>收件資訊</h3>
+    <div class="row"><div class="grow"><div class="sub">收件人</div>
+      <div class="ttl2">{{ order.recipient_name or '—' }}</div></div></div>
+    <div class="row"><div class="grow"><div class="sub">電話</div>
+      <div class="ttl2">{{ order.recipient_phone or '—' }}</div></div></div>
+    <div class="row"><div class="grow"><div class="sub">地址</div>
+      <div class="ttl2">{{ order.shipping_address or '—' }}</div></div></div>
+    {% if customer %}
+    <div class="row"><div class="grow"><div class="sub">客戶</div>
+      <div class="ttl2">{{ customer.name }}（{{ customer.phone or '—' }}）</div></div></div>
+    {% endif %}
+    {% if order.note %}
+    <div class="row"><div class="grow"><div class="sub">備註</div>
+      <div class="ttl2">{{ order.note }}</div></div></div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>品項</h3>
+    {% for it in items %}
+    <div class="row">
+      <div class="grow">
+        <div class="ttl2">{{ prod_map.get(it.product_id, '#' ~ it.product_id) }}</div>
+        <div class="sub">{{ it.combo_code }} × {{ it.qty }}</div>
+      </div>
+      <div>${{ '%.0f'|format(it.subtotal or 0) }}</div>
+    </div>
+    {% else %}
+      <div class="empty">無品項</div>
+    {% endfor %}
+    <div class="row"><div class="grow"><div class="ttl2">合計</div></div>
+      <div class="big">${{ '%.0f'|format(order.total_amount or 0) }}</div></div>
+  </div>
+
+  <div class="card">
+    <h3>狀態</h3>
+    <form method="post" action="/m/orders/{{ order.id }}">
+      <label>付款狀態</label>
+      <select name="payment_status">
+        <option value="unpaid" {{ 'selected' if order.payment_status=='unpaid' }}>未付款</option>
+        <option value="paid" {{ 'selected' if order.payment_status=='paid' }}>已付款</option>
+        <option value="refunded" {{ 'selected' if order.payment_status=='refunded' }}>已退款</option>
+      </select>
+      <label>出貨狀態</label>
+      <select name="shipping_status">
+        <option value="pending" {{ 'selected' if order.shipping_status=='pending' }}>待出貨</option>
+        <option value="shipped" {{ 'selected' if order.shipping_status=='shipped' }}>已出貨</option>
+        <option value="delivered" {{ 'selected' if order.shipping_status=='delivered' }}>已送達</option>
+        <option value="cancelled" {{ 'selected' if order.shipping_status=='cancelled' }}>已取消</option>
+      </select>
+      <div class="hint">出貨扣紙袋請走「出貨」頁，此處僅改狀態旗標。</div>
+      <div style="height:10px"></div>
+      <button class="btn btn-primary" type="submit">儲存狀態</button>
+    </form>
+  </div>
+{% endblock %}

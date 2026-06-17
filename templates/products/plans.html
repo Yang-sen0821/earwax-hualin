@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}銷售方案 / BOM — Flora Court{% endblock %}
+{% block content %}
+{% include "products/_style.html" %}
+{% include "products/_flash.html" %}
+
+<div class="pg-head">
+  <h1>銷售方案與 BOM</h1>
+  <a class="btn" href="{{ url_for('products.index') }}">← 回商品</a>
+</div>
+
+<div class="card">
+  <p class="sub">4 銷售組合（combo_code 鎖定：{{ combo_codes | join(' / ') }}）。BOM 為鎖扣法，紙袋不進 BOM。</p>
+</div>
+
+{% for r in rows %}
+<div class="sec">
+  <h2>{{ r.plan.combo_code }} — {{ r.plan.name }}
+    {% if r.plan.active %}<span class="tag tag-on">啟用</span>{% else %}<span class="tag tag-off">停用</span>{% endif %}
+  </h2>
+  <p class="sub">售價：{{ r.plan.price }}</p>
+  {% if r.bom %}
+  <table class="tbl">
+    <thead><tr><th>商品</th><th>SKU</th><th>扣減池</th><th>每組扣量</th><th>單位</th></tr></thead>
+    <tbody>
+      {% for it in r.bom %}
+      <tr>
+        <td>{{ it.product_name }}</td>
+        <td>{{ it.product_sku }}</td>
+        <td>{{ it.pool }}</td>
+        <td>{{ it.qty_per_unit }}</td>
+        <td>{{ it.unit or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="sub">此方案尚無 BOM 項目。</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{# products 模組共用樣式（自有，不改 base.html）#}
+<style>
+  .flash-wrap { margin-bottom:16px; display:flex; flex-direction:column; gap:8px; }
+  .flash { padding:10px 14px; border-radius:8px; font-size:14px; border:1px solid; }
+  .flash-ok { background:#eef7ee; border-color:#bcd9bc; color:#2f6b2f; }
+  .flash-error { background:#fbeeee; border-color:#e0bcbc; color:#9a2b2b; }
+  .flash-message { background:#eef2f7; border-color:#c2cdd9; color:#33506b; }
+  .pg-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .pg-head h1 { font-size:22px; margin:0; }
+  .btn { display:inline-block; text-decoration:none; cursor:pointer; border:1px solid var(--line);
+         background:#fff; color:var(--ink); padding:8px 14px; border-radius:8px; font-size:14px; }
+  .btn:hover { background:var(--bg); }
+  .btn-primary { background:var(--fc); color:#fff; border-color:var(--fc); }
+  .btn-primary:hover { opacity:.9; background:var(--fc); }
+  .btn-sm { padding:5px 10px; font-size:13px; }
+  .btn-danger { color:#9a2b2b; border-color:#e0bcbc; }
+  table.tbl { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line);
+              border-radius:12px; overflow:hidden; }
+  table.tbl th, table.tbl td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; }
+  table.tbl th { background:var(--bg); color:#6b6256; font-weight:600; }
+  table.tbl tr:last-child td { border-bottom:none; }
+  .tag { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; }
+  .tag-on { background:#e7f3e7; color:#2f6b2f; }
+  .tag-off { background:#f0ede9; color:#8a8378; }
+  .tag-pkg { background:#eef2f7; color:#33506b; }
+  .thumb { width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid var(--line); background:var(--bg); }
+  form.inline { display:inline; margin:0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:13px; color:#6b6256; margin-bottom:5px; }
+  .field input[type=text], .field input[type=number], .field textarea, .field select {
+      width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px;
+      font-size:14px; font-family:inherit; background:#fff; }
+  .field textarea { min-height:80px; resize:vertical; }
+  .check { display:flex; align-items:center; gap:8px; font-size:14px; }
+  .sub { color:#8a8378; font-size:13px; }
+  .sec { margin-top:24px; }
+  .sec h2 { font-size:17px; border-bottom:2px solid var(--line); padding-bottom:6px; }
+  .inline-form { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+  .inline-form .field { margin-bottom:0; }
+  @media (max-width:600px){ .grid2 { grid-template-columns:1fr; } }
+</style>

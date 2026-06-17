@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}財務報表 — Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  table { width:100%; max-width:560px; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th,td { padding:12px 16px; border-bottom:1px solid var(--line); font-size:15px; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.sub td { color:#8a8378; }
+  tr.result td { font-weight:700; font-size:17px; background:var(--bg); color:var(--fc); }
+  .formula { color:#8a8378; font-size:14px; margin:8px 0 20px; }
+</style>
+
+<h2 style="margin-top:0;">財務報表</h2>
+<p class="formula">毛利 = 銷售金額 − 商品成本　｜　淨利 = 毛利 − 包材 − 行銷 − 其他支出<br>
+資料來源：financial_entries（分錄）＋ extra_expenses（其他支出）。成本為後台可調測試值。</p>
+
+<table>
+  <tbody>
+    <tr><td>銷售金額</td><td class="num">${{ '%.2f'|format(fin.sales_amount) }}</td></tr>
+    <tr class="sub"><td>　− 商品成本</td><td class="num">${{ '%.2f'|format(fin.product_cost) }}</td></tr>
+    <tr class="result"><td>毛利</td><td class="num">${{ '%.2f'|format(fin.gross_profit) }}</td></tr>
+    <tr class="sub"><td>　− 包材成本</td><td class="num">${{ '%.2f'|format(fin.packaging_cost) }}</td></tr>
+    <tr class="sub"><td>　− 行銷成本</td><td class="num">${{ '%.2f'|format(fin.marketing_cost) }}</td></tr>
+    <tr class="sub"><td>　− 其他支出</td><td class="num">${{ '%.2f'|format(fin.other_expense) }}</td></tr>
+    <tr class="result"><td>淨利</td><td class="num">${{ '%.2f'|format(fin.net_profit) }}</td></tr>
+  </tbody>
+</table>
+
+{% if fin.other_entries %}
+<h3 style="margin-top:28px;">其他分錄</h3>
+<table>
+  <tbody>
+    {% for k, v in fin.other_entries.items() %}
+    <tr><td>{{ k }}</td><td class="num">${{ '%.2f'|format(v) }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<p class="muted" style="margin-top:20px;">
+  {% if fin.sales_amount == fin.orders_total and fin.orders_total > 0 %}
+  註：financial_entries 無 sale 分錄，銷售金額暫以訂單總額 ${{ '%.0f'|format(fin.orders_total) }} 估算。
+  {% endif %}
+</p>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}報表中心 — Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+  .kpi { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .kpi .v { font-size:28px; font-weight:700; color:var(--fc); }
+  .kpi .l { color:#8a8378; font-size:14px; margin-top:4px; }
+  .links { display:flex; gap:10px; flex-wrap:wrap; margin:8px 0 24px; }
+  .links a { text-decoration:none; background:var(--fc); color:#fff; padding:10px 16px; border-radius:8px; font-size:15px; }
+  .links a.ghost { background:#fff; color:var(--fc); border:1px solid var(--fc); }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+  th { background:var(--bg); color:#6b6357; font-weight:600; }
+  td.num,th.num { text-align:right; }
+</style>
+
+<h2 style="margin-top:0;">報表中心</h2>
+
+<div class="grid">
+  <div class="kpi"><div class="v">{{ kpi.order_count }}</div><div class="l">訂單總數</div></div>
+  <div class="kpi"><div class="v">{{ kpi.customer_count }}</div><div class="l">客戶總數</div></div>
+  <div class="kpi"><div class="v">${{ '%.0f'|format(kpi.sales_amount) }}</div><div class="l">銷售金額</div></div>
+  <div class="kpi"><div class="v">${{ '%.0f'|format(kpi.net_profit) }}</div><div class="l">淨利</div></div>
+</div>
+
+<div class="links">
+  <a href="/reports/sales">銷售報表（日/月/年）</a>
+  <a href="/reports/inventory">庫存報表</a>
+  <a href="/reports/finance">財務報表</a>
+</div>
+
+<div class="links">
+  <a class="ghost" href="/reports/export/orders.xlsx">匯出訂單 Excel</a>
+  <a class="ghost" href="/reports/export/inventory.xlsx">匯出庫存 Excel</a>
+  <a class="ghost" href="/reports/export/movements.xlsx">匯出異動 Excel</a>
+  <a class="ghost" href="/reports/export/sales.xlsx?g=month">匯出銷售報表 Excel</a>
+</div>
+
+<h3>商品銷售排行（依組合）</h3>
+<table>
+  <thead><tr>
+    <th>組合</th><th class="num">明細筆數</th><th class="num">銷售組數</th><th class="num">銷售金額</th>
+  </tr></thead>
+  <tbody>
+    {% for r in ranking %}
+    <tr>
+      <td>{{ r.combo_name }} <span class="muted">({{ r.combo_code }})</span></td>
+      <td class="num">{{ r.line_count }}</td>
+      <td class="num">{{ r.total_qty }}</td>
+      <td class="num">${{ '%.0f'|format(r.total_amount) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="muted">尚無銷售資料</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

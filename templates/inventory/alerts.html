@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "inventory/_macros.html" as ui %}
+{% block title %}低水位警示 — Flora Court{% endblock %}
+
+{% block content %}
+<div class="card">
+  {{ ui.subnav('alerts') }}
+  {{ ui.flashes() }}
+
+  <h2 style="margin-top:0;">低水位警示</h2>
+  <p class="muted">門檻讀 inventory_thresholds（後台可改）。normal 池剩餘量 ≤ 門檻 ⇒ 觸發警示。</p>
+
+  <div style="overflow-x:auto;">
+  <table style="border-collapse:collapse; width:100%; font-size:14px; min-width:520px;">
+    <thead>
+      <tr style="background:#faf8f5;">
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">狀態</th>
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">商品</th>
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">庫存池</th>
+        <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">正常剩餘</th>
+        <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">門檻</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr style="{% if it.low_water %}background:#fdecec;{% endif %}">
+        <td style="padding:8px 10px; border:1px solid #e5e0d8; font-weight:600; color:{{ '#a33' if it.low_water else '#256b2e' }};">
+          {{ '⚠ 低水位' if it.low_water else '正常' }}
+        </td>
+        <td style="padding:8px 10px; border:1px solid #e5e0d8;">{{ it.product_name }}</td>
+        <td style="padding:8px 10px; border:1px solid #e5e0d8;">{{ it.pool_label }}</td>
+        <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ it.remaining }}</td>
+        <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ it.threshold }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="padding:14px; text-align:center;" class="muted">尚未設定任何低水位門檻。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

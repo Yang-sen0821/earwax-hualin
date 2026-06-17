@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}商品管理 — Flora Court{% endblock %}
+{% block content %}
+{% include "products/_style.html" %}
+{% include "products/_flash.html" %}
+
+<div class="pg-head">
+  <h1>商品管理</h1>
+  <div>
+    <a class="btn" href="{{ url_for('products.plans') }}">銷售方案 / BOM</a>
+    <a class="btn" href="{{ url_for('products.settings') }}">系統設定</a>
+    <a class="btn btn-primary" href="{{ url_for('products.create') }}">+ 新增商品</a>
+  </div>
+</div>
+
+{% if products %}
+<table class="tbl">
+  <thead>
+    <tr>
+      <th>圖</th><th>SKU</th><th>名稱</th><th>分類</th><th>狀態</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in products %}
+    <tr>
+      <td>
+        {% if p.image_url %}<img class="thumb" src="{{ p.image_url }}" alt="">{% else %}<span class="sub">—</span>{% endif %}
+      </td>
+      <td><a href="{{ url_for('products.detail', pid=p.id) }}">{{ p.sku }}</a></td>
+      <td>
+        {{ p.name }}
+        {% if p.is_packaging %}<span class="tag tag-pkg">包材</span>{% endif %}
+      </td>
+      <td>{{ p.category or '—' }}</td>
+      <td>
+        {% if p.active %}<span class="tag tag-on">上架</span>{% else %}<span class="tag tag-off">下架</span>{% endif %}
+      </td>
+      <td>
+        <a class="btn btn-sm" href="{{ url_for('products.detail', pid=p.id) }}">明細</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="card"><p class="sub">尚無商品，點右上「新增商品」建立第一筆。</p></div>
+{% endif %}
+{% endblock %}

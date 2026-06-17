@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登入 — Flora Court ERP</title>
+  <style>
+    body { margin:0; font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+           background:#faf8f5; display:flex; min-height:100vh; align-items:center; justify-content:center; }
+    .box { background:#fff; border:1px solid #e5e0d8; border-radius:14px; padding:32px;
+           width:320px; max-width:90vw; }
+    h1 { color:#7a6f63; font-size:20px; margin:0 0 20px; text-align:center; }
+    label { display:block; font-size:13px; color:#8a8378; margin:12px 0 4px; }
+    input { width:100%; padding:10px; border:1px solid #e5e0d8; border-radius:8px; font-size:15px; }
+    button { width:100%; margin-top:20px; padding:11px; background:#7a6f63; color:#fff;
+             border:none; border-radius:8px; font-size:15px; cursor:pointer; }
+    .err { color:#a33; font-size:13px; margin-top:12px; text-align:center; }
+  </style>
+</head>
+<body>
+  <form class="box" method="post">
+    <h1>Flora Court ERP</h1>
+    <label>帳號</label>
+    <input name="username" autofocus required>
+    <label>密碼</label>
+    <input name="password" type="password" required>
+    <button type="submit">登入</button>
+    {% with msgs = get_flashed_messages() %}
+      {% if msgs %}<div class="err">{{ msgs[0] }}</div>{% endif %}
+    {% endwith %}
+  </form>
+</body>
+</html>

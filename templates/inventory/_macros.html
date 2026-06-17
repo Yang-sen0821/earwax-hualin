@@ -1,0 +1,38 @@
+{# 共用片段：flash 訊息 + 子頁導覽列 #}
+{% macro flashes() %}
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% if msgs %}
+      <div style="margin-bottom:16px;">
+        {% for cat, m in msgs %}
+          <div style="padding:10px 14px; border-radius:8px; margin-bottom:6px;
+            {% if cat == 'error' %}background:#fdecec; color:#a33; border:1px solid #f3c0c0;
+            {% elif cat == 'warn' %}background:#fff6e5; color:#8a6d00; border:1px solid #f0dca0;
+            {% else %}background:#eaf6ec; color:#256b2e; border:1px solid #bfe3c4;{% endif %}">
+            {{ m }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+{% endmacro %}
+
+{% macro subnav(active) %}
+  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px;">
+    {% set links = [
+      ('index','總覽','inventory.index'),
+      ('restock','補貨入庫','inventory.restock'),
+      ('deduct','通用出庫','inventory.deduct'),
+      ('split','拆盒調撥','inventory.split'),
+      ('adjust','盤點調整','inventory.adjust'),
+      ('movements','異動紀錄','inventory.movements'),
+      ('alerts','低水位警示','inventory.alerts')
+    ] %}
+    {% for key, label, endpoint in links %}
+      <a href="{{ url_for(endpoint) }}"
+         style="text-decoration:none; padding:7px 12px; border-radius:8px; font-size:14px;
+         {% if active == key %}background:#7a6f63; color:#fff;{% else %}background:#fff; color:#2b2b2b; border:1px solid #e5e0d8;{% endif %}">
+        {{ label }}
+      </a>
+    {% endfor %}
+  </div>
+{% endmacro %}

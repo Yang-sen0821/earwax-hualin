@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "inventory/_macros.html" as ui %}
+{% block title %}庫存總覽 — Flora Court{% endblock %}
+
+{% block content %}
+<div class="card">
+  {{ ui.subnav('index') }}
+  {{ ui.flashes() }}
+
+  <h2 style="margin-top:0;">庫存總覽</h2>
+  <p class="muted">三池（盒裝 / 裸片 / 紙袋）× 5 分類（正常 / 預留 / 公關品 / 試用品 / 損耗報廢）。
+     預留為物理分列，一般銷售取不到。</p>
+
+  {% for p in products %}
+    <div style="margin-bottom:28px;">
+      <h3 style="margin:0 0 8px;">{{ p.name }}
+        <span class="muted" style="font-size:13px; font-weight:400;">（{{ p.sku }}{% if p.is_packaging %}・包材{% endif %}）</span>
+      </h3>
+      <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:14px;">
+        <thead>
+          <tr style="background:#faf8f5;">
+            <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">池 \ 分類</th>
+            {% for c in cats %}
+              <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ cat_labels[c] }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for pool in pools %}
+          <tr>
+            <td style="padding:8px 10px; border:1px solid #e5e0d8; font-weight:600;">
+              {{ pool_labels[pool] }}
+              {% if low_map.get(p.id, {}).get(pool) is not none %}
+                <span title="低水位 門檻 {{ low_map[p.id][pool] }}"
+                  style="color:#a33; font-size:12px;">●低水位</span>
+              {% endif %}
+            </td>
+            {% for c in cats %}
+              {% set v = bal_map.get(p.id, {}).get((pool, c)) %}
+              <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;
+                {% if c == 'reserved' %}background:#f6f2ff;{% endif %}
+                {% if v is none %}color:#bbb;{% endif %}">
+                {{ v if v is not none else '—' }}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  {% else %}
+    <p class="muted">尚無商品。</p>
+  {% endfor %}
+
+  {% if can_write %}
+  <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+    <a href="{{ url_for('inventory.restock') }}" style="text-decoration:none; background:#7a6f63; color:#fff; padding:9px 16px; border-radius:8px;">補貨入庫</a>
+    <a href="{{ url_for('inventory.split') }}" style="text-decoration:none; background:#fff; color:#2b2b2b; border:1px solid #e5e0d8; padding:9px 16px; border-radius:8px;">拆盒調撥</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

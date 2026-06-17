@@ -1,0 +1,44 @@
+{% extends "mobile/_base.html" %}
+{% block title %}訂單列表{% endblock %}
+{% block heading %}訂單{% endblock %}
+{% set active_tab = 'orders' %}
+{% macro pay_badge(s) %}
+  <span class="badge {{ 'b-paid' if s=='paid' else 'b-unpaid' if s=='unpaid' else 'b-other' }}">{{ s }}</span>
+{% endmacro %}
+{% macro ship_badge(s) %}
+  <span class="badge {{ 'b-shipped' if s=='shipped' else 'b-pending' if s=='pending' else 'b-other' }}">{{ s }}</span>
+{% endmacro %}
+{% block content %}
+  <form class="filters" method="get" action="/m/orders">
+    <select name="pay" onchange="this.form.submit()">
+      <option value="">付款(全部)</option>
+      <option value="unpaid" {{ 'selected' if pay=='unpaid' }}>未付</option>
+      <option value="paid" {{ 'selected' if pay=='paid' }}>已付</option>
+    </select>
+    <select name="ship" onchange="this.form.submit()">
+      <option value="">出貨(全部)</option>
+      <option value="pending" {{ 'selected' if ship=='pending' }}>待出</option>
+      <option value="shipped" {{ 'selected' if ship=='shipped' }}>已出</option>
+    </select>
+  </form>
+
+  <div class="card">
+    {% if orders %}
+      {% for o in orders %}
+      <a class="itemlink" href="/m/orders/{{ o.id }}">
+        <div class="row">
+          <div class="grow">
+            <div class="ttl2">{{ o.order_no }}</div>
+            <div class="sub">{{ o.recipient_name or '—' }}　${{ '%.0f'|format(o.total_amount or 0) }}</div>
+            <div class="sub">{{ pay_badge(o.payment_status) }} {{ ship_badge(o.shipping_status) }}</div>
+          </div>
+          <span>›</span>
+        </div>
+      </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty">沒有符合的訂單</div>
+    {% endif %}
+  </div>
+  <a class="btn btn-primary" href="/m/orders/new">＋ 快速建單</a>
+{% endblock %}

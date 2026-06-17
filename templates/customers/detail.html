@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} — 客戶明細{% endblock %}
+{% block content %}
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="card" style="margin-bottom:16px;color:#a33;">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+  {% endif %}
+{% endwith %}
+
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h2 style="margin:0;flex:1;">{{ customer.name }}</h2>
+    <a href="{{ url_for('customers.edit', customer_id=customer.id) }}"
+       style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">編輯</a>
+    <form method="post" action="{{ url_for('customers.delete', customer_id=customer.id) }}"
+          onsubmit="return confirm('確定刪除此客戶？');" style="display:inline;">
+      <button type="submit" style="padding:8px 14px;border:1px solid #d9b0b0;border-radius:8px;background:#fff;color:#a33;cursor:pointer;">刪除</button>
+    </form>
+  </div>
+  <p class="muted" style="margin:8px 0 0;">
+    電話：{{ customer.phone or '—' }}　|　Email：{{ customer.email or '—' }}
+  </p>
+  {% if customer.note %}<p style="margin:8px 0 0;">備註：{{ customer.note }}</p>{% endif %}
+  <p style="margin-top:12px;"><a href="{{ url_for('customers.index') }}" style="color:var(--fc);text-decoration:none;">← 返回客戶列表</a></p>
+</div>
+
+<!-- 多地址 -->
+<div class="card" style="margin-top:16px;">
+  <h3 style="margin-top:0;">收件地址（多筆）</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">收件人</th>
+        <th style="padding:8px;">電話</th>
+        <th style="padding:8px;">地址</th>
+        <th style="padding:8px;">預設</th>
+        <th style="padding:8px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in addresses %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px;">{{ a.recipient or '—' }}</td>
+        <td style="padding:8px;">{{ a.phone or '—' }}</td>
+        <td style="padding:8px;">{{ a.address }}</td>
+        <td style="padding:8px;">{% if a.is_default %}<span style="color:var(--fc);font-weight:600;">預設</span>{% else %}
+          <form method="post" action="{{ url_for('customers.address_set_default', customer_id=customer.id, address_id=a.id) }}" style="display:inline;">
+            <button type="submit" style="border:none;background:none;color:var(--fc);cursor:pointer;text-decoration:underline;">設為預設</button>
+          </form>{% endif %}</td>
+        <td style="padding:8px;">
+          <form method="post" action="{{ url_for('customers.address_delete', customer_id=customer.id, address_id=a.id) }}"
+                onsubmit="return confirm('刪除此地址？');" style="display:inline;">
+            <button type="submit" style="border:none;background:none;color:#a33;cursor:pointer;">刪除</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted" style="padding:12px;text-align:center;">尚無地址</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h4 style="margin:20px 0 8px;">新增地址</h4>
+  <form method="post" action="{{ url_for('customers.address_new', customer_id=customer.id) }}"
+        style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <input name="recipient" placeholder="收件人" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+    <input name="phone" placeholder="電話" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+    <input name="address" placeholder="地址（必填）" required style="grid-column:1/3;padding:8px;border:1px solid var(--line);border-radius:8px;">
+    <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" name="is_default"> 設為預設</label>
+    <button type="submit" style="background:var(--fc);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;justify-self:end;">新增地址</button>
+  </form>
+</div>
+
+<!-- 歷史訂單 -->
+<div class="card" style="margin-top:16px;">
+  <h3 style="margin-top:0;">歷史訂單</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">訂單編號</th>
+        <th style="padding:8px;">金額</th>
+        <th style="padding:8px;">付款</th>
+        <th style="padding:8px;">出貨</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:var(--fc);text-decoration:none;">{{ o.order_no }}</a></td>
+        <td style="padding:8px;">{{ o.total_amount }}</td>
+        <td style="padding:8px;">{{ o.payment_status }}</td>
+        <td style="padding:8px;">{{ o.shipping_status }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted" style="padding:12px;text-align:center;">尚無訂單</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

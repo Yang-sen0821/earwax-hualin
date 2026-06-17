@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}庫存報表 — Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+  th { background:var(--bg); color:#6b6357; font-weight:600; }
+  td.num,th.num { text-align:right; }
+  .bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .exp { text-decoration:none; background:#fff; color:var(--fc); border:1px solid var(--fc); padding:8px 14px; border-radius:8px; font-size:14px; }
+  .pool { font-variant:small-caps; color:#6b6357; }
+</style>
+
+<div class="bar">
+  <h2 style="margin:0;">庫存報表</h2>
+  <a class="exp" href="/reports/export/inventory.xlsx">匯出 Excel</a>
+</div>
+<p class="muted">目前(normal) / 預留(reserved) / 公關品(pr) / 試用(trial) / 損耗(scrap)；「已售」為 SALE 異動累計，掛在各商品首列。</p>
+
+<table>
+  <thead><tr>
+    <th>SKU</th><th>商品</th><th>庫存池</th>
+    <th class="num">目前</th><th class="num">預留</th><th class="num">公關品</th>
+    <th class="num">試用</th><th class="num">損耗</th><th class="num">已售</th><th>單位</th>
+  </tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.sku }}</td>
+      <td>{{ r.product_name }}</td>
+      <td class="pool">{{ r.inventory_pool }}</td>
+      <td class="num">{{ r.normal }}</td>
+      <td class="num">{{ r.reserved }}</td>
+      <td class="num">{{ r.pr }}</td>
+      <td class="num">{{ r.trial }}</td>
+      <td class="num">{{ r.scrap }}</td>
+      <td class="num">{{ r.sold }}</td>
+      <td>{{ r.unit }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="muted">尚無庫存資料</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

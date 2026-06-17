@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ order.order_no }} — 訂單明細{% endblock %}
+{% block content %}
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="card" style="margin-bottom:16px;color:#a33;">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+  {% endif %}
+{% endwith %}
+
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h2 style="margin:0;flex:1;">訂單 {{ order.order_no }}</h2>
+    <a href="{{ url_for('orders.index') }}" style="color:var(--fc);text-decoration:none;">← 返回列表</a>
+  </div>
+  <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div><span class="muted">客戶：</span>{% if customer %}<a href="{{ url_for('customers.detail', customer_id=customer.id) }}" style="color:var(--fc);text-decoration:none;">{{ customer.name }}</a>{% else %}—{% endif %}</div>
+    <div><span class="muted">收件人：</span>{{ order.recipient_name or '—' }}</div>
+    <div><span class="muted">收件電話：</span>{{ order.recipient_phone or '—' }}</div>
+    <div><span class="muted">總金額：</span><strong>{{ order.total_amount }}</strong></div>
+    <div style="grid-column:1/3;"><span class="muted">收件地址：</span>{{ order.shipping_address or '—' }}</div>
+    {% if order.note %}<div style="grid-column:1/3;"><span class="muted">備註：</span>{{ order.note }}</div>{% endif %}
+    <div><span class="muted">建立：</span>{{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '' }}</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <h3 style="margin-top:0;">品項</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">商品</th>
+        <th style="padding:8px;">組合</th>
+        <th style="padding:8px;">數量</th>
+        <th style="padding:8px;">單價</th>
+        <th style="padding:8px;">小計</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr style="border-bottom:1px solid var(--line);">
+        <td style="padding:8px;">{{ prod_map[it.product_id].name if prod_map.get(it.product_id) else '#' ~ it.product_id }}</td>
+        <td style="padding:8px;">{{ it.combo_code }}</td>
+        <td style="padding:8px;">{{ it.qty }}</td>
+        <td style="padding:8px;">{{ it.unit_price }}</td>
+        <td style="padding:8px;">{{ it.subtotal }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted" style="padding:12px;text-align:center;">無品項</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+  <div>
+    <h3 style="margin-top:0;">付款狀態</h3>
+    <p class="muted">目前：<strong>{{ order.payment_status }}</strong></p>
+    <form method="post" action="{{ url_for('orders.update_payment', order_id=order.id) }}" style="display:flex;gap:8px;">
+      <select name="payment_status" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+        {% for s in payment_statuses %}<option value="{{ s }}" {{ 'selected' if order.payment_status==s }}>{{ s }}</option>{% endfor %}
+      </select>
+      <button type="submit" style="background:var(--fc);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">更新</button>
+    </form>
+  </div>
+  <div>
+    <h3 style="margin-top:0;">出貨狀態</h3>
+    <p class="muted">目前：<strong>{{ order.shipping_status }}</strong></p>
+    <form method="post" action="{{ url_for('orders.update_shipping', order_id=order.id) }}" style="display:flex;gap:8px;">
+      <select name="shipping_status" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+        {% for s in shipping_statuses %}<option value="{{ s }}" {{ 'selected' if order.shipping_status==s }}>{{ s }}</option>{% endfor %}
+      </select>
+      <button type="submit" style="background:var(--fc);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">更新</button>
+    </form>
+    <p class="muted" style="font-size:13px;margin-top:8px;">設為 shipped 時，系統會在同一交易內扣紙袋（§4.4）；紙袋不足將擋下出貨。</p>
+  </div>
+</div>
+{% endblock %}

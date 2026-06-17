@@ -1,0 +1,75 @@
+{% extends "mobile/_base.html" %}
+{% block title %}快速建單{% endblock %}
+{% block heading %}快速建單{% endblock %}
+{% block back %}<a href="/m/orders" class="back">‹</a>{% endblock %}
+{% set active_tab = 'new' %}
+{% block content %}
+  <form method="post" action="/m/orders/new">
+    <div class="card">
+      <h3>收件資訊</h3>
+      <label>客戶（選填）</label>
+      <select name="customer_id">
+        <option value="">— 不綁定客戶 —</option>
+        {% for c in customers %}
+        <option value="{{ c.id }}">{{ c.name }}{% if c.phone %}（{{ c.phone }}）{% endif %}</option>
+        {% endfor %}
+      </select>
+      <label>收件人</label>
+      <input type="text" name="recipient_name" autocomplete="off">
+      <label>電話</label>
+      <input type="tel" name="recipient_phone" autocomplete="off">
+      <label>地址</label>
+      <input type="text" name="shipping_address" autocomplete="off">
+      <label>備註</label>
+      <textarea name="note"></textarea>
+    </div>
+
+    <div class="card">
+      <h3>品項（缺貨整張取消）</h3>
+      <div class="item-line" style="font-size:12px;color:var(--soft)">
+        <div>商品</div><div>組合</div><div>數量</div>
+      </div>
+      <div id="lines">
+        {% for i in range(3) %}
+        <div class="item-line">
+          <select name="product_id">
+            <option value="">—</option>
+            {% for p in products %}
+            <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <select name="combo_code">
+            {% for cc in combo_codes %}
+            <option value="{{ cc }}">{{ cc }}</option>
+            {% endfor %}
+          </select>
+          <input type="number" name="qty" min="1" inputmode="numeric" placeholder="0">
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-ghost btn-line" onclick="addLine()">＋ 多加一列</button>
+      <div class="hint">空白列會自動略過；任一品項庫存不足，整張訂單不建立（§4.2）。</div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">送出建單</button>
+  </form>
+
+  <template id="line-tpl">
+    <div class="item-line">
+      <select name="product_id">
+        <option value="">—</option>
+        {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+      </select>
+      <select name="combo_code">
+        {% for cc in combo_codes %}<option value="{{ cc }}">{{ cc }}</option>{% endfor %}
+      </select>
+      <input type="number" name="qty" min="1" inputmode="numeric" placeholder="0">
+    </div>
+  </template>
+  <script>
+    function addLine(){
+      var t=document.getElementById('line-tpl');
+      document.getElementById('lines').appendChild(t.content.cloneNode(true));
+    }
+  </script>
+{% endblock %}

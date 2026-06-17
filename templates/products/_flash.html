@@ -1,0 +1,10 @@
+{# 共用 flash 訊息區（products 模組自有；不改 base.html）#}
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% if msgs %}
+    <div class="flash-wrap">
+      {% for cat, m in msgs %}
+        <div class="flash flash-{{ cat }}">{{ m }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

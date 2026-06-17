@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "inventory/_macros.html" as ui %}
+{% block title %}通用出庫 — Flora Court{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:560px;">
+  {{ ui.subnav('deduct') }}
+  {{ ui.flashes() }}
+
+  <h2 style="margin-top:0;">通用出庫</h2>
+  <p class="muted">業務出庫：贈品 / 試用 / 公關 / KOL / 員工 / 店內 / 損耗 / 報廢。
+     扣減後自動檢查低水位。</p>
+
+  <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+    <label>商品
+      <select name="product_id" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for p in products %}<option value="{{ p.id }}">{{ p.name }}（{{ p.sku }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>庫存池
+      <select name="inventory_pool" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for pool in pools %}<option value="{{ pool }}">{{ pool_labels[pool] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>分類
+      <select name="stock_category" style="width:100%; padding:8px; margin-top:4px;">
+        {% for c in cats %}<option value="{{ c }}" {% if c=='normal' %}selected{% endif %}>{{ cat_labels[c] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>出庫類型
+      <select name="movement_type" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for t in out_types %}<option value="{{ t }}">{{ mtype_labels[t] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>數量
+      <input type="number" name="qty" min="1" required style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <label>備註
+      <input type="text" name="note" style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:11px; border-radius:8px; font-size:15px; cursor:pointer;">確認出庫</button>
+  </form>
+</div>
+{% endblock %}

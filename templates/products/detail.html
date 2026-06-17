@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — Flora Court{% endblock %}
+{% block content %}
+{% include "products/_style.html" %}
+{% include "products/_flash.html" %}
+
+<div class="pg-head">
+  <h1>{{ product.name }}</h1>
+  <div>
+    <a class="btn" href="{{ url_for('products.index') }}">← 回列表</a>
+    <a class="btn" href="{{ url_for('products.edit', pid=product.id) }}">編輯</a>
+    <form class="inline" method="post" action="{{ url_for('products.toggle_active', pid=product.id) }}">
+      <button type="submit" class="btn">{{ '下架' if product.active else '上架' }}</button>
+    </form>
+  </div>
+</div>
+
+{# ---- 基本資訊 ---- #}
+<div class="card">
+  <div class="grid2">
+    <div>
+      {% if product.image_url %}
+        <img class="thumb" style="width:120px;height:120px;" src="{{ product.image_url }}" alt="">
+      {% else %}
+        <div class="sub">（無圖片）</div>
+      {% endif %}
+    </div>
+    <div>
+      <p><strong>SKU：</strong>{{ product.sku }}</p>
+      <p><strong>分類：</strong>{{ product.category or '—' }}</p>
+      <p><strong>狀態：</strong>
+        {% if product.active %}<span class="tag tag-on">上架</span>{% else %}<span class="tag tag-off">下架</span>{% endif %}
+        {% if product.is_packaging %}<span class="tag tag-pkg">共用包材</span>{% endif %}
+      </p>
+      <p class="sub">{{ product.description or '' }}</p>
+    </div>
+  </div>
+</div>
+
+{# ---- 規格 product_specs（D3）---- #}
+<div class="sec">
+  <h2>規格</h2>
+  {% if specs %}
+  <table class="tbl">
+    <thead><tr><th>規格名稱</th><th>規格值</th><th>單位</th><th></th></tr></thead>
+    <tbody>
+      {% for s in specs %}
+      <tr>
+        <td>{{ s.spec_name }}</td>
+        <td>{{ s.spec_value or '—' }}</td>
+        <td>{{ s.unit or '—' }}</td>
+        <td>
+          <form class="inline" method="post" action="{{ url_for('products.spec_delete', pid=product.id, spec_id=s.id) }}">
+            <button type="submit" class="btn btn-sm btn-danger">刪除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="sub">尚無規格。</p>
+  {% endif %}
+
+  <div class="card sec">
+    <form class="inline-form" method="post" action="{{ url_for('products.spec_add', pid=product.id) }}">
+      <div class="field"><label>規格名稱</label><input type="text" name="spec_name" placeholder="單片裝 / 5片/盒" required></div>
+      <div class="field"><label>規格值</label><input type="text" name="spec_value" placeholder="1 片"></div>
+      <div class="field"><label>單位</label><input type="text" name="unit" placeholder="piece / box"></div>
+      <button type="submit" class="btn btn-primary">新增規格</button>
+    </form>
+  </div>
+</div>
+
+{# ---- 銷售方案 + BOM（D7 檢視）---- #}
+<div class="sec">
+  <h2>銷售方案與 BOM（本商品扣減對應）</h2>
+  <table class="tbl">
+    <thead><tr><th>方案代碼</th><th>名稱</th><th>價格</th><th>扣減池</th><th>每組扣量</th><th>單位</th><th>狀態</th></tr></thead>
+    <tbody>
+      {% for r in plan_rows %}
+      <tr>
+        <td>{{ r.combo_code }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.price }}</td>
+        <td>{{ r.pool or '—（本商品不扣此方案）' }}</td>
+        <td>{{ r.qty_per_unit if r.qty_per_unit is not none else '—' }}</td>
+        <td>{{ r.unit or '—' }}</td>
+        <td>{% if r.active %}<span class="tag tag-on">啟用</span>{% else %}<span class="tag tag-off">停用</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="sub">紙袋為獨立耗材，不進銷售方案 BOM（出貨時另扣）。</p>
+</div>
+
+{# ---- 低水位門檻 inventory_thresholds（D9）---- #}
+<div class="sec">
+  <h2>低水位門檻（庫存警示）</h2>
+  {% if thresholds %}
+  <table class="tbl">
+    <thead><tr><th>庫存池</th><th>門檻數量</th></tr></thead>
+    <tbody>
+      {% for t in thresholds %}
+      <tr><td>{{ t.inventory_pool }}</td><td>{{ t.threshold_qty }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="sub">尚未設定門檻。</p>
+  {% endif %}
+
+  <div class="card sec">
+    <form class="inline-form" method="post" action="{{ url_for('products.threshold_set', pid=product.id) }}">
+      <div class="field">
+        <label>庫存池</label>
+        <select name="inventory_pool" required>
+          {% for pool in pools %}<option value="{{ pool }}">{{ pool }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label>門檻數量</label><input type="number" name="threshold_qty" min="0" required></div>
+      <button type="submit" class="btn btn-primary">設定門檻</button>
+    </form>
+    <p class="sub">門檻讀此表（後台可改）；扣減後 remaining ≤ threshold 即觸發低水位警示。owner / warehouse 可改。</p>
+  </div>
+</div>
+{% endblock %}

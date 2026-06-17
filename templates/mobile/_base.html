@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>{% block title %}Flora Court 手機後台{% endblock %}</title>
+  <style>
+    :root { --fc:#7a6f63; --bg:#faf8f5; --line:#e5e0d8; --ink:#2b2b2b; --ok:#3a8d5b; --warn:#a33; --soft:#8a8378; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body { margin:0; padding:0; }
+    body { font-family:-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+           background:var(--bg); color:var(--ink); font-size:16px; padding-bottom:64px; }
+    .topbar { background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20;
+              display:flex; align-items:center; gap:8px; padding:12px 16px; }
+    .topbar .back { text-decoration:none; color:var(--fc); font-size:22px; line-height:1; }
+    .topbar .ttl { font-weight:700; color:var(--fc); font-size:18px; flex:1; }
+    .topbar .who { font-size:12px; color:var(--soft); }
+    main { padding:12px; max-width:680px; margin:0 auto; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
+    .card h3 { margin:0 0 10px; font-size:15px; color:var(--soft); font-weight:600; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 0;
+           border-bottom:1px solid var(--line); }
+    .row:last-child { border-bottom:none; }
+    .grow { flex:1; min-width:0; }
+    .ttl2 { font-weight:600; }
+    .sub { font-size:13px; color:var(--soft); margin-top:2px; }
+    .big { font-size:22px; font-weight:700; color:var(--fc); }
+    a.itemlink { text-decoration:none; color:inherit; display:block; }
+    .badge { display:inline-block; font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+    .b-unpaid { background:#fbeaea; color:var(--warn); border-color:#f0caca; }
+    .b-paid { background:#e7f3ec; color:var(--ok); border-color:#c9e6d4; }
+    .b-pending { background:#fdf3e3; color:#a9772a; border-color:#f0dcb9; }
+    .b-shipped { background:#e7f3ec; color:var(--ok); border-color:#c9e6d4; }
+    .b-other { background:#eee; color:#555; }
+    label { display:block; font-size:13px; color:var(--soft); margin:10px 0 4px; }
+    input,select,textarea { width:100%; font-size:16px; padding:11px 12px; border:1px solid var(--line);
+            border-radius:10px; background:#fff; color:var(--ink); }
+    textarea { min-height:64px; resize:vertical; }
+    .btn { display:block; width:100%; text-align:center; border:none; border-radius:12px; padding:14px;
+           font-size:16px; font-weight:600; cursor:pointer; text-decoration:none; }
+    .btn-primary { background:var(--fc); color:#fff; }
+    .btn-ghost { background:#fff; color:var(--fc); border:1px solid var(--fc); }
+    .btn-line { display:inline-block; width:auto; padding:9px 16px; font-size:14px; }
+    .flash { background:#fff7e6; border:1px solid #f0dcb9; color:#8a6d2a; border-radius:10px;
+             padding:10px 12px; margin-bottom:12px; font-size:14px; }
+    .filters { display:flex; gap:8px; margin-bottom:12px; }
+    .filters select,.filters input { flex:1; }
+    .empty { text-align:center; color:var(--soft); padding:32px 0; }
+    .tabbar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line);
+              display:flex; z-index:20; }
+    .tabbar a { flex:1; text-align:center; text-decoration:none; color:var(--soft); font-size:11px;
+                padding:8px 0 10px; }
+    .tabbar a.on { color:var(--fc); font-weight:700; }
+    .tabbar a .ic { display:block; font-size:18px; margin-bottom:2px; }
+    .pool-total { display:flex; justify-content:space-between; align-items:baseline; }
+    .item-line { display:grid; grid-template-columns:1fr 1fr 70px; gap:6px; margin-bottom:8px; }
+    .hint { font-size:12px; color:var(--soft); margin-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    {% block back %}<a href="/m" class="back">‹</a>{% endblock %}
+    <span class="ttl">{% block heading %}手機後台{% endblock %}</span>
+    <span class="who">{{ (user.display_name or user.username) if user else '' }}</span>
+  </div>
+  <main>
+    {% with msgs = get_flashed_messages() %}
+      {% if msgs %}{% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <nav class="tabbar">
+    <a href="/m/orders"    class="{{ 'on' if active_tab=='orders' }}"><span class="ic">📋</span>訂單</a>
+    <a href="/m/orders/new"class="{{ 'on' if active_tab=='new' }}"><span class="ic">＋</span>建單</a>
+    <a href="/m/inventory" class="{{ 'on' if active_tab=='inventory' }}"><span class="ic">📦</span>庫存</a>
+    <a href="/m/shipments" class="{{ 'on' if active_tab=='shipments' }}"><span class="ic">🚚</span>出貨</a>
+    <a href="/m/customers" class="{{ 'on' if active_tab=='customers' }}"><span class="ic">👤</span>客戶</a>
+  </nav>
+</body>
+</html>

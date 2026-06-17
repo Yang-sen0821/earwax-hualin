@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}匯入結果 #{{ batch.id }} — Flora Court{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h2 style="margin:0;flex:1;">匯入結果：{{ batch.batch_name }}</h2>
+    <a href="{{ url_for('orders.import_page') }}" style="color:var(--fc);text-decoration:none;">← 返回匯入</a>
+  </div>
+  <p class="muted">檔案：{{ batch.source_file }}　狀態：{{ batch.status }}</p>
+  <div style="display:flex;gap:24px;margin-top:8px;flex-wrap:wrap;">
+    <div>總列數<br><strong style="font-size:1.4em;">{{ batch.imported_rows }}</strong></div>
+    <div>成功<br><strong style="font-size:1.4em;color:#2a7;">{{ batch.success_rows }}</strong></div>
+    <div>失敗<br><strong style="font-size:1.4em;color:#c33;">{{ batch.failed_rows }}</strong></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <h3 style="margin:0 0 12px;">逐列明細（{{ rows|length }}）</h3>
+  <div style="overflow-x:auto;">
+  <table style="width:100%;border-collapse:collapse;font-size:0.92em;">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:6px;">#</th>
+        <th style="padding:6px;">訂單編號</th>
+        <th style="padding:6px;">姓名</th>
+        <th style="padding:6px;">電話</th>
+        <th style="padding:6px;">商品</th>
+        <th style="padding:6px;">數量</th>
+        <th style="padding:6px;">金額</th>
+        <th style="padding:6px;">付款</th>
+        <th style="padding:6px;">出貨</th>
+        <th style="padding:6px;">錯誤</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr style="border-bottom:1px solid var(--line);{% if r.error_message %}background:#fff4f4;{% endif %}">
+        <td style="padding:6px;">{{ r.id }}</td>
+        <td style="padding:6px;">{{ r.order_no or '' }}</td>
+        <td style="padding:6px;">{{ r.name or '' }}</td>
+        <td style="padding:6px;">{{ r.phone or '' }}</td>
+        <td style="padding:6px;">{{ r.product_name or '' }}</td>
+        <td style="padding:6px;">{{ r.qty if r.qty is not none else '' }}</td>
+        <td style="padding:6px;">{{ r.amount if r.amount is not none else '' }}</td>
+        <td style="padding:6px;">{{ r.payment_status or '' }}</td>
+        <td style="padding:6px;">{{ r.shipping_status or '' }}</td>
+        <td style="padding:6px;color:#c33;">{{ r.error_message or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

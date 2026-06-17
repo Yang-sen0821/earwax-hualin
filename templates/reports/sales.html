@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}銷售報表 — Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tabs a { text-decoration:none; padding:8px 16px; border-radius:8px; border:1px solid var(--fc); color:var(--fc); font-size:15px; }
+  .tabs a.on { background:var(--fc); color:#fff; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:24px; }
+  th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+  th { background:var(--bg); color:#6b6357; font-weight:600; }
+  td.num,th.num { text-align:right; }
+  tr.total td { font-weight:700; background:var(--bg); }
+  .bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .exp { text-decoration:none; background:#fff; color:var(--fc); border:1px solid var(--fc); padding:8px 14px; border-radius:8px; font-size:14px; }
+</style>
+
+<div class="bar">
+  <h2 style="margin:0;">銷售報表</h2>
+  <a class="exp" href="/reports/export/sales.xlsx?g={{ granularity }}">匯出 Excel</a>
+</div>
+
+<div class="tabs">
+  <a href="/reports/sales?g=day"   class="{{ 'on' if granularity=='day' }}">日報</a>
+  <a href="/reports/sales?g=month" class="{{ 'on' if granularity=='month' }}">月報</a>
+  <a href="/reports/sales?g=year"  class="{{ 'on' if granularity=='year' }}">年報</a>
+</div>
+
+<table>
+  <thead><tr><th>期間</th><th class="num">訂單數</th><th class="num">銷售金額</th></tr></thead>
+  <tbody>
+    {% for p in periods %}
+    <tr><td>{{ p.period }}</td><td class="num">{{ p.order_count }}</td><td class="num">${{ '%.0f'|format(p.amount) }}</td></tr>
+    {% else %}
+    <tr><td colspan="3" class="muted">尚無銷售資料</td></tr>
+    {% endfor %}
+    {% if periods %}
+    <tr class="total"><td>合計</td><td class="num">{{ totals.order_count }}</td><td class="num">${{ '%.0f'|format(totals.amount) }}</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+
+<h3>商品銷售排行（依組合）</h3>
+<table>
+  <thead><tr><th>組合</th><th class="num">明細筆數</th><th class="num">銷售組數</th><th class="num">銷售金額</th></tr></thead>
+  <tbody>
+    {% for r in ranking %}
+    <tr>
+      <td>{{ r.combo_name }} <span class="muted">({{ r.combo_code }})</span></td>
+      <td class="num">{{ r.line_count }}</td>
+      <td class="num">{{ r.total_qty }}</td>
+      <td class="num">${{ '%.0f'|format(r.total_amount) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="muted">尚無銷售資料</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

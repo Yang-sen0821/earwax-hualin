@@ -1,0 +1,25 @@
+{% extends "mobile/_base.html" %}
+{% block title %}客戶查詢{% endblock %}
+{% block heading %}客戶{% endblock %}
+{% set active_tab = 'customers' %}
+{% block content %}
+  <form class="filters" method="get" action="/m/customers">
+    <input type="search" name="q" value="{{ kw }}" placeholder="姓名 / 電話" autocomplete="off">
+    <button class="btn btn-primary btn-line" type="submit">搜尋</button>
+  </form>
+  <div class="card">
+    {% if customers %}
+      {% for c in customers %}
+      <div class="row">
+        <div class="grow">
+          <div class="ttl2">{{ c.name }}</div>
+          <div class="sub">{{ c.phone or '—' }}{% if c.email %}　{{ c.email }}{% endif %}</div>
+          {% if c.note %}<div class="sub">{{ c.note }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">{{ '查無客戶' if kw else '尚無客戶資料' }}</div>
+    {% endif %}
+  </div>
+{% endblock %}

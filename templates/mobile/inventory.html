@@ -1,0 +1,31 @@
+{% extends "mobile/_base.html" %}
+{% block title %}庫存摘要{% endblock %}
+{% block heading %}庫存摘要{% endblock %}
+{% set active_tab = 'inventory' %}
+{% set pool_label = {'boxed':'盒裝 boxed','loose_piece':'裸片 loose_piece','paper_bag':'紙袋 paper_bag'} %}
+{% set cat_label = {'normal':'正常','reserved':'預留','pr':'公關','trial':'試用','scrap':'損耗報廢'} %}
+{% block content %}
+  {% for pool in pool_order %}
+    {% set bucket = pools.get(pool) %}
+    <div class="card">
+      <div class="pool-total">
+        <h3 style="margin:0">{{ pool_label.get(pool, pool) }}</h3>
+        <span class="big">{{ bucket.total if bucket else 0 }}</span>
+      </div>
+      {% if bucket and bucket.rows %}
+        {% for r in bucket.rows %}
+        <div class="row">
+          <div class="grow">
+            <div class="ttl2">{{ prod_map.get(r.product_id, '#' ~ r.product_id) }}</div>
+            <div class="sub">{{ cat_label.get(r.stock_category, r.stock_category) }}</div>
+          </div>
+          <div class="ttl2">{{ r.qty }} {{ r.unit or '' }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">無資料</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <div class="hint" style="text-align:center">預留(reserved)為硬隔離分列，一般銷售扣不到。</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Flora Court ERP{% endblock %}</title>
+  <style>
+    :root { --fc:#7a6f63; --bg:#faf8f5; --line:#e5e0d8; --ink:#2b2b2b; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+           background:var(--bg); color:var(--ink); }
+    header { background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
+    .nav { max-width:1100px; margin:0 auto; display:flex; align-items:center; gap:4px;
+           padding:10px 16px; flex-wrap:wrap; }
+    .brand { font-weight:700; color:var(--fc); margin-right:16px; font-size:18px; }
+    .nav a { text-decoration:none; color:var(--ink); padding:8px 12px; border-radius:8px; font-size:15px; }
+    .nav a:hover { background:var(--bg); }
+    .nav a.active { background:var(--fc); color:#fff; }
+    .spacer { flex:1; }
+    .logout { color:#a33 !important; }
+    main { max-width:1100px; margin:24px auto; padding:0 16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
+    .muted { color:#8a8378; }
+    /* 行動裝置 */
+    @media (max-width:600px){
+      .nav { gap:2px; padding:8px; }
+      .brand { width:100%; margin-bottom:4px; }
+      .nav a { padding:8px 10px; font-size:14px; flex:1 0 auto; text-align:center; }
+      .spacer { display:none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="nav">
+      <span class="brand">Flora Court</span>
+      <a href="/products"  class="{{ 'active' if section=='products' }}">商品</a>
+      <a href="/inventory" class="{{ 'active' if section=='inventory' }}">庫存</a>
+      <a href="/orders"    class="{{ 'active' if section=='orders' }}">訂單</a>
+      <a href="/customers" class="{{ 'active' if section=='customers' }}">客戶</a>
+      <a href="/reports"   class="{{ 'active' if section=='reports' }}">報表</a>
+      <a href="/m"         class="{{ 'active' if section=='mobile' }}">手機版</a>
+      <span class="spacer"></span>
+      <a href="/logout" class="logout">登出</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}
+    <div class="card">
+      <h2 class="muted">{{ section or '首頁' }}</h2>
+      <p class="muted">地基層已就緒，此區塊由模組層填入。</p>
+    </div>
+    {% endblock %}
+  </main>
+</body>
+</html>
