@@ -29,14 +29,19 @@ from db import (
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
-# 報表頁可編輯的成本 settings key（與 _roi_report 讀取的同一處，不另造來源）
-COST_SETTING_KEYS = {
-    "product": "cost_product_test",
-    "packaging": "cost_packaging_test",
-    "marketing": "cost_marketing_test",
-}
-# financial_entries 中「已知四類」之外者，於 ROI 聚合為「其他支出」(other_expense)
-KNOWN_ENTRY_TYPES = ("sale", "product_cost", "packaging", "marketing")
+# =========================================================================
+# 支出管理：唯一成本來源 = extra_expenses by category
+# 類別固定下拉（單一成本來源；ROI/財務一律依此加總，禁止第二套來源）
+# =========================================================================
+EXPENSE_CATEGORIES = ("設備", "面膜進貨成本", "建檔費", "包材", "行銷", "其他")
+
+# ROI/財務成本側對照：類別 → 聚合鍵
+CATEGORY_PRODUCT = "面膜進貨成本"   # 商品成本
+CATEGORY_PACKAGING = "包材"         # 包材成本
+CATEGORY_MARKETING = "行銷"         # 行銷成本
+CATEGORY_SETUP = "建檔費"           # 建檔額外支出
+CATEGORY_EQUIPMENT = "設備"         # 設備（投資，計入總投入與回本門檻）
+CATEGORY_OTHER = "其他"             # 其他支出
 
 
 def _uid():
@@ -186,108 +191,139 @@ def _inventory_report(db):
 
 
 # =========================================================================
+# 共用：成本聚合（唯一來源）= extra_expenses 依 category 加總
+# ROI 與財務的成本側全部走這裡，絕不再從 settings cost_*_test 或
+# financial_entries(product_cost/packaging/marketing) 取成本，避免重複計算。
+# =========================================================================
+def _cost_by_category(db):
+    """回傳各成本類別小計（dict）+ 衍生的彙整欄位。
+
+    商品成本 = Σ(面膜進貨成本)
+    包材成本 = Σ(包材)
+    行銷成本 = Σ(行銷)
+    建檔額外支出 = Σ(建檔費)
+    設備 = Σ(設備)  ← 投資，計入總投入成本與回本門檻
+    其他支出 = Σ(其他)
+    總投入成本 = 以上全部加總
+    """
+    rows = (
+        db.query(
+            ExtraExpense.category,
+            func.coalesce(func.sum(ExtraExpense.amount), 0),
+        )
+        .group_by(ExtraExpense.category)
+        .all()
+    )
+    by_cat = {cat: 0.0 for cat in EXPENSE_CATEGORIES}
+    uncategorized = 0.0
+    for cat, amt in rows:
+        a = _to_float(amt)
+        if cat in by_cat:
+            by_cat[cat] += a
+        else:
+            # 類別空白/非閉集者，歸入「其他」以免漏算（單一來源不丟資料）
+            uncategorized += a
+    by_cat[CATEGORY_OTHER] += uncategorized
+
+    product_cost = by_cat[CATEGORY_PRODUCT]
+    packaging_cost = by_cat[CATEGORY_PACKAGING]
+    marketing_cost = by_cat[CATEGORY_MARKETING]
+    setup_cost = by_cat[CATEGORY_SETUP]
+    equipment_cost = by_cat[CATEGORY_EQUIPMENT]
+    other_cost = by_cat[CATEGORY_OTHER]
+    total_cost = (product_cost + packaging_cost + marketing_cost
+                  + setup_cost + equipment_cost + other_cost)
+    return {
+        "by_cat": by_cat,
+        "product_cost": product_cost,
+        "packaging_cost": packaging_cost,
+        "marketing_cost": marketing_cost,
+        "setup_cost": setup_cost,
+        "equipment_cost": equipment_cost,
+        "other_cost": other_cost,
+        "total_cost": total_cost,
+    }
+
+
+# =========================================================================
 # 共用：財務報表（毛利 / 淨利）D12 / D13
+# 成本來源：唯一 = extra_expenses by category（不再讀 financial_entries 成本分錄）
+# 收入來源：financial_entries(sale) 優先，無則回退 orders.total_amount（維持不動）
 # =========================================================================
 def _financial_report(db):
     """毛利 = 銷售金額 − 商品成本
-       淨利 = 毛利 − 包材 − 行銷 − 其他支出
+       淨利 = 銷售金額 − 總投入成本
 
-    來源：
-      - financial_entries：entry_type ∈ {sale, product_cost, packaging, marketing, ...}
-      - extra_expenses：其他支出（全部加總）
-    銷售金額亦回退到 orders.total_amount（若 financial_entries 無 sale 分錄時供參考）。
+    成本側單一來源 = extra_expenses by category：
+      商品成本=面膜進貨成本、包材=包材、行銷=行銷、
+      建檔=建檔費、設備=設備、其他=其他 → 總投入成本為全部加總。
+    收入側維持原口徑（financial_entries sale 或 orders 總額）。
     """
-    fe_rows = (
-        db.query(
-            FinancialEntry.entry_type,
-            func.coalesce(func.sum(FinancialEntry.amount), 0),
-        )
-        .group_by(FinancialEntry.entry_type)
-        .all()
+    cost = _cost_by_category(db)
+
+    # ---- 收入側（不動）----
+    sale_entries = _to_float(
+        db.query(func.coalesce(func.sum(FinancialEntry.amount), 0))
+        .filter(FinancialEntry.entry_type == "sale")
+        .scalar()
     )
-    fe = {etype: _to_float(amt) for etype, amt in fe_rows}
-
-    sales_amount = fe.get("sale", 0.0)
-    product_cost = fe.get("product_cost", 0.0)
-    packaging_cost = fe.get("packaging", 0.0)
-    marketing_cost = fe.get("marketing", 0.0)
-
-    # 銷售分錄缺漏時，以 orders 總額作參考基準
     orders_total = _to_float(
         db.query(func.coalesce(func.sum(Order.total_amount), 0)).scalar()
     )
-    if sales_amount == 0.0 and orders_total > 0:
-        sales_amount = orders_total
+    sales_amount = sale_entries if sale_entries > 0 else orders_total
 
-    other_expense = _to_float(
-        db.query(func.coalesce(func.sum(ExtraExpense.amount), 0)).scalar()
-    )
+    product_cost = cost["product_cost"]
+    total_cost = cost["total_cost"]
 
     gross_profit = sales_amount - product_cost
-    net_profit = gross_profit - packaging_cost - marketing_cost - other_expense
+    net_profit = sales_amount - total_cost
 
     return {
         "sales_amount": sales_amount,
         "orders_total": orders_total,
         "product_cost": product_cost,
-        "packaging_cost": packaging_cost,
-        "marketing_cost": marketing_cost,
-        "other_expense": other_expense,
+        "packaging_cost": cost["packaging_cost"],
+        "marketing_cost": cost["marketing_cost"],
+        "setup_cost": cost["setup_cost"],
+        "equipment_cost": cost["equipment_cost"],
+        "other_expense": cost["other_cost"],
+        "total_cost": total_cost,
         "gross_profit": gross_profit,
         "net_profit": net_profit,
-        # 其他分錄明細（除已知四類外）
-        "other_entries": {k: v for k, v in fe.items()
-                          if k not in ("sale", "product_cost", "packaging", "marketing")},
+        "by_cat": cost["by_cat"],
     }
 
 
 # =========================================================================
 # 共用：成本與利潤（投報率 ROI）— 限 owner / accounting
 # =========================================================================
-def _setting_float(db, key):
-    """讀 settings 數值型測試值（§七：成本先用測試值，後台可改）。查無/非數值回 0。"""
-    s = db.query(Setting).filter_by(key=key).first()
-    if not s or s.value is None:
-        return 0.0
-    try:
-        return float(s.value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _roi_report(db):
     """成本與利潤（投報率 ROI）聚合，唯讀。
 
-    累積總收入口徑：
+    累積總收入口徑（不動）：
       - 優先採 financial_entries 的 sale 分錄加總；
       - 若無 sale 分錄，則以「已認列營收」訂單為準＝orders 中
-        payment_status='paid' 或 shipping_status ∈ (shipped, delivered) 的 total_amount 加總
-        （排除未付款且未出貨的草稿/待處理單）。
+        payment_status='paid' 或 shipping_status ∈ (shipped, delivered) 的 total_amount 加總。
 
-    成本各項口徑（成本＝分錄優先，無分錄時退回 settings 測試值；§七）：
-      - 商品成本 product_cost ：financial_entries(product_cost) 或 settings.cost_product_test
-      - 包材成本 packaging     ：financial_entries(packaging)   或 settings.cost_packaging_test
-      - 行銷成本 marketing     ：financial_entries(marketing)   或 settings.cost_marketing_test
-      - 建檔額外支出 extra     ：extra_expenses 全部加總（PIF/貼紙小卡/紙袋加價/外盒加價/版模費等）
-      - 其他支出 other_entries ：financial_entries 中上述四類以外的分錄加總
-      總投入成本 ＝ 商品 + 包材 + 行銷 + 建檔額外支出 + 其他
+    成本各項口徑（唯一來源 = extra_expenses by category）：
+      - 商品成本     = Σ(面膜進貨成本)
+      - 包材成本     = Σ(包材)
+      - 行銷成本     = Σ(行銷)
+      - 建檔額外支出 = Σ(建檔費)
+      - 設備         = Σ(設備)  ← 投資，計入總投入成本與回本門檻
+      - 其他支出     = Σ(其他)
+      總投入成本 ＝ 以上全部加總
 
     淨利 ＝ 總收入 − 總投入成本
     毛利 ＝ 總收入 − 商品成本
     ROI% ＝ 淨利 ÷ 總投入成本 × 100（總成本為 0 時回 None → 前台顯示 N/A，不除以零）
     """
-    fe_rows = (
-        db.query(
-            FinancialEntry.entry_type,
-            func.coalesce(func.sum(FinancialEntry.amount), 0),
-        )
-        .group_by(FinancialEntry.entry_type)
-        .all()
+    # ---- 累積總收入（收入側維持不動）----
+    sale_entries = _to_float(
+        db.query(func.coalesce(func.sum(FinancialEntry.amount), 0))
+        .filter(FinancialEntry.entry_type == "sale")
+        .scalar()
     )
-    fe = {etype: _to_float(amt) for etype, amt in fe_rows}
-
-    # ---- 累積總收入 ----
-    sale_entries = fe.get("sale", 0.0)
     recognized_orders_total = _to_float(
         db.query(func.coalesce(func.sum(Order.total_amount), 0))
         .filter(
@@ -303,27 +339,15 @@ def _roi_report(db):
         total_revenue = recognized_orders_total
         revenue_basis = "orders(已付款/已出貨)"
 
-    # ---- 成本各項（分錄優先，無則退回 settings 測試值）----
-    # 旗標：若該類 financial_entry 存在且非零，則 settings 測試值被覆寫（前台顯示鎖定，避免編輯後不反映的錯覺）
-    fe_product = fe.get("product_cost", 0.0)
-    fe_packaging = fe.get("packaging", 0.0)
-    fe_marketing = fe.get("marketing", 0.0)
-    product_cost = fe_product or _setting_float(db, "cost_product_test")
-    packaging_cost = fe_packaging or _setting_float(db, "cost_packaging_test")
-    marketing_cost = fe_marketing or _setting_float(db, "cost_marketing_test")
-    product_overridden = fe_product != 0.0
-    packaging_overridden = fe_packaging != 0.0
-    marketing_overridden = fe_marketing != 0.0
-
-    extra_expense = _to_float(
-        db.query(func.coalesce(func.sum(ExtraExpense.amount), 0)).scalar()
-    )
-
-    known = KNOWN_ENTRY_TYPES
-    other_entries = {k: v for k, v in fe.items() if k not in known}
-    other_expense = sum(other_entries.values())
-
-    total_cost = product_cost + packaging_cost + marketing_cost + extra_expense + other_expense
+    # ---- 成本各項（唯一來源 = extra_expenses by category）----
+    cost = _cost_by_category(db)
+    product_cost = cost["product_cost"]
+    packaging_cost = cost["packaging_cost"]
+    marketing_cost = cost["marketing_cost"]
+    setup_cost = cost["setup_cost"]
+    equipment_cost = cost["equipment_cost"]
+    other_expense = cost["other_cost"]
+    total_cost = cost["total_cost"]
 
     gross_profit = total_revenue - product_cost
     net_profit = total_revenue - total_cost
@@ -349,12 +373,10 @@ def _roi_report(db):
         "product_cost": product_cost,
         "packaging_cost": packaging_cost,
         "marketing_cost": marketing_cost,
-        "product_overridden": product_overridden,
-        "packaging_overridden": packaging_overridden,
-        "marketing_overridden": marketing_overridden,
-        "extra_expense": extra_expense,
+        "setup_cost": setup_cost,
+        "equipment_cost": equipment_cost,
         "other_expense": other_expense,
-        "other_entries": other_entries,
+        "by_cat": cost["by_cat"],
         "total_cost": total_cost,
         "gross_profit": gross_profit,
         "net_profit": net_profit,
@@ -437,41 +459,23 @@ def finance():
 @reports_bp.route("/roi")
 @role_required("owner", "accounting")
 def roi():
+    """ROI 頁：唯讀。成本各類別明細只顯示，不在此編輯（編輯走支出管理頁）。"""
     db = get_session()
     roi_data = _roi_report(db)
-    # 成本三項目前可編輯的 settings 值（與 _roi_report 同一來源）
-    cost_settings = {
-        "product": _setting_float(db, "cost_product_test"),
-        "packaging": _setting_float(db, "cost_packaging_test"),
-        "marketing": _setting_float(db, "cost_marketing_test"),
-    }
-    # 建檔額外支出明細（extra_expenses）— 可新增/編輯/刪除
-    extras = db.query(ExtraExpense).order_by(ExtraExpense.id).all()
-    # 其他支出明細（financial_entries 中已知四類之外）— 可新增/編輯/刪除
-    other_entries_rows = (
-        db.query(FinancialEntry)
-        .filter(~FinancialEntry.entry_type.in_(KNOWN_ENTRY_TYPES))
-        .order_by(FinancialEntry.id)
-        .all()
-    )
     return render_template(
         "reports/roi.html", section="reports", roi=roi_data,
-        cost_settings=cost_settings, extras=extras,
-        other_entries_rows=other_entries_rows,
-        can_edit=current_user().role in ("owner", "accounting"),
+        categories=EXPENSE_CATEGORIES,
     )
 
 
 # =========================================================================
-# 報表頁成本支出編輯（限 owner / accounting）— 只開放「成本/支出」，收入/庫存維持唯讀
-# 來源對齊 _roi_report 讀取處：
-#   - 商品/包材/行銷成本 → settings.cost_*_test（沿用既有 key，不另造來源）
-#   - 建檔額外支出        → extra_expenses 表（name + amount）
-#   - 其他支出            → financial_entries 中「已知四類之外」的分錄
-# 存檔後 redirect 回 ROI，重算後的數字即時反映。
+# 支出管理（/reports/expenses）— 唯一成本來源：extra_expenses by category
+# 品項列管：name + amount + category + expense_date + note（vendor 不在 schema，置於 note）
+# 權限：owner / accounting（@role_required）
+# 收入、已售、庫存維持唯讀自動，本模組不碰。
 # =========================================================================
 def _parse_amount(raw):
-    """解析金額字串為 float；回 (ok, value, err)。空/非數值/負數視情況回錯。"""
+    """解析金額字串為 float；回 (ok, value, err)。空/非數值/負數回錯。"""
     raw = (raw or "").strip()
     try:
         v = float(raw)
@@ -482,81 +486,113 @@ def _parse_amount(raw):
     return True, v, None
 
 
-@reports_bp.route("/roi/cost/update", methods=["POST"])
+def _parse_date(raw):
+    """解析 YYYY-MM-DD；空字串回 (True, None)；格式錯回 (False, None, err)。"""
+    raw = (raw or "").strip()
+    if not raw:
+        return True, None, None
+    try:
+        return True, datetime.strptime(raw, "%Y-%m-%d"), None
+    except ValueError:
+        return False, None, "日期格式需為 YYYY-MM-DD"
+
+
+@reports_bp.route("/expenses")
 @role_required("owner", "accounting")
-def roi_cost_update():
-    """更新商品/包材/行銷成本 → 寫回 settings.cost_*_test（與 ROI 讀取同一處）。"""
+def expenses():
     db = get_session()
-    kind = request.form.get("kind", "").strip()
-    key = COST_SETTING_KEYS.get(kind)
-    if not key:
-        abort(400)
-    ok, val, err = _parse_amount(request.form.get("value", ""))
-    if not ok:
-        flash(f"成本更新失敗：{err}", "error")
-        return redirect(url_for("reports.roi"))
-    s = db.query(Setting).filter_by(key=key).first()
-    if not s:
-        # 沿用 init 既有 key；若意外不存在則建立同型別列，不另造新來源命名
-        s = Setting(key=key, value_type="float",
-                    description="成本測試值（報表頁可編輯）")
-        db.add(s)
-    s.value = str(val)
-    s.value_type = s.value_type or "float"
-    s.updated_by = _uid()
-    s.updated_at = datetime.utcnow()
-    db.commit()
-    label = {"product": "商品成本", "packaging": "包材成本", "marketing": "行銷成本"}[kind]
-    flash(f"{label} 已更新為 {val:.2f}", "ok")
-    return redirect(url_for("reports.roi"))
+    rows = db.query(ExtraExpense).order_by(
+        ExtraExpense.category, ExtraExpense.id).all()
+    # 依類別分組（依固定下拉順序），各類別小計 + 總計
+    grouped = {cat: [] for cat in EXPENSE_CATEGORIES}
+    other_key = CATEGORY_OTHER
+    subtotals = {cat: 0.0 for cat in EXPENSE_CATEGORIES}
+    grand_total = 0.0
+    for e in rows:
+        cat = e.category if e.category in grouped else other_key
+        grouped[cat].append(e)
+        amt = _to_float(e.amount)
+        subtotals[cat] += amt
+        grand_total += amt
+    groups = [
+        {"category": cat, "rows": grouped[cat], "subtotal": subtotals[cat]}
+        for cat in EXPENSE_CATEGORIES
+    ]
+    return render_template(
+        "reports/expenses.html", section="expenses",
+        groups=groups, grand_total=grand_total,
+        categories=EXPENSE_CATEGORIES,
+    )
 
 
-@reports_bp.route("/roi/extra/add", methods=["POST"])
+@reports_bp.route("/expenses/add", methods=["POST"])
 @role_required("owner", "accounting")
-def roi_extra_add():
-    """新增一筆建檔額外支出 → extra_expenses。"""
+def expense_add():
     db = get_session()
     name = request.form.get("name", "").strip()
+    category = request.form.get("category", "").strip()
     if not name:
-        flash("建檔額外支出：項目名稱為必填", "error")
-        return redirect(url_for("reports.roi"))
+        flash("品項名稱為必填", "error")
+        return redirect(url_for("reports.expenses"))
+    if category not in EXPENSE_CATEGORIES:
+        flash("類別不合法（須為固定下拉之一）", "error")
+        return redirect(url_for("reports.expenses"))
     ok, val, err = _parse_amount(request.form.get("amount", ""))
     if not ok:
-        flash(f"建檔額外支出：{err}", "error")
-        return redirect(url_for("reports.roi"))
-    db.add(ExtraExpense(name=name, amount=val, created_by=_uid()))
+        flash(f"支出新增失敗：{err}", "error")
+        return redirect(url_for("reports.expenses"))
+    dok, dt, derr = _parse_date(request.form.get("expense_date", ""))
+    if not dok:
+        flash(f"支出新增失敗：{derr}", "error")
+        return redirect(url_for("reports.expenses"))
+    db.add(ExtraExpense(
+        name=name, amount=val, category=category,
+        expense_date=dt or datetime.utcnow(),
+        note=request.form.get("note", "").strip() or None,
+        created_by=_uid(),
+    ))
     db.commit()
-    flash(f"建檔額外支出「{name}」已新增（{val:.2f}）", "ok")
-    return redirect(url_for("reports.roi"))
+    flash(f"支出「{name}」已新增（{category} {val:.2f}）", "ok")
+    return redirect(url_for("reports.expenses"))
 
 
-@reports_bp.route("/roi/extra/<int:eid>/update", methods=["POST"])
+@reports_bp.route("/expenses/<int:eid>/update", methods=["POST"])
 @role_required("owner", "accounting")
-def roi_extra_update(eid):
-    """編輯一筆建檔額外支出（名稱 + 金額）。"""
+def expense_update(eid):
     db = get_session()
     e = db.query(ExtraExpense).get(eid)
     if not e:
         abort(404)
     name = request.form.get("name", "").strip()
+    category = request.form.get("category", "").strip()
     if not name:
-        flash("建檔額外支出：項目名稱為必填", "error")
-        return redirect(url_for("reports.roi"))
+        flash("品項名稱為必填", "error")
+        return redirect(url_for("reports.expenses"))
+    if category not in EXPENSE_CATEGORIES:
+        flash("類別不合法（須為固定下拉之一）", "error")
+        return redirect(url_for("reports.expenses"))
     ok, val, err = _parse_amount(request.form.get("amount", ""))
     if not ok:
-        flash(f"建檔額外支出：{err}", "error")
-        return redirect(url_for("reports.roi"))
+        flash(f"支出更新失敗：{err}", "error")
+        return redirect(url_for("reports.expenses"))
+    dok, dt, derr = _parse_date(request.form.get("expense_date", ""))
+    if not dok:
+        flash(f"支出更新失敗：{derr}", "error")
+        return redirect(url_for("reports.expenses"))
     e.name = name
     e.amount = val
+    e.category = category
+    if dt is not None:
+        e.expense_date = dt
+    e.note = request.form.get("note", "").strip() or None
     db.commit()
-    flash(f"建檔額外支出「{name}」已更新（{val:.2f}）", "ok")
-    return redirect(url_for("reports.roi"))
+    flash(f"支出「{name}」已更新（{category} {val:.2f}）", "ok")
+    return redirect(url_for("reports.expenses"))
 
 
-@reports_bp.route("/roi/extra/<int:eid>/delete", methods=["POST"])
+@reports_bp.route("/expenses/<int:eid>/delete", methods=["POST"])
 @role_required("owner", "accounting")
-def roi_extra_delete(eid):
-    """刪除一筆建檔額外支出。"""
+def expense_delete(eid):
     db = get_session()
     e = db.query(ExtraExpense).get(eid)
     if not e:
@@ -564,76 +600,8 @@ def roi_extra_delete(eid):
     nm = e.name
     db.delete(e)
     db.commit()
-    flash(f"建檔額外支出「{nm}」已刪除", "ok")
-    return redirect(url_for("reports.roi"))
-
-
-@reports_bp.route("/roi/other/add", methods=["POST"])
-@role_required("owner", "accounting")
-def roi_other_add():
-    """新增一筆其他支出 → financial_entries（entry_type 不得為已知四類）。"""
-    db = get_session()
-    etype = request.form.get("entry_type", "").strip()
-    if not etype:
-        flash("其他支出：分錄類型為必填", "error")
-        return redirect(url_for("reports.roi"))
-    if etype in KNOWN_ENTRY_TYPES:
-        flash(f"其他支出：分錄類型不得為 {etype}（屬收入/成本主類，請用上方欄位）", "error")
-        return redirect(url_for("reports.roi"))
-    ok, val, err = _parse_amount(request.form.get("amount", ""))
-    if not ok:
-        flash(f"其他支出：{err}", "error")
-        return redirect(url_for("reports.roi"))
-    db.add(FinancialEntry(
-        entry_type=etype, amount=val,
-        description=request.form.get("description", "").strip() or None,
-        created_by=_uid(),
-    ))
-    db.commit()
-    flash(f"其他支出「{etype}」已新增（{val:.2f}）", "ok")
-    return redirect(url_for("reports.roi"))
-
-
-@reports_bp.route("/roi/other/<int:fid>/update", methods=["POST"])
-@role_required("owner", "accounting")
-def roi_other_update(fid):
-    """編輯一筆其他支出（financial_entries；禁止改成收入/成本主類）。"""
-    db = get_session()
-    f = db.query(FinancialEntry).get(fid)
-    if not f or f.entry_type in KNOWN_ENTRY_TYPES:
-        abort(404)
-    etype = request.form.get("entry_type", "").strip()
-    if not etype:
-        flash("其他支出：分錄類型為必填", "error")
-        return redirect(url_for("reports.roi"))
-    if etype in KNOWN_ENTRY_TYPES:
-        flash(f"其他支出：分錄類型不得改為 {etype}", "error")
-        return redirect(url_for("reports.roi"))
-    ok, val, err = _parse_amount(request.form.get("amount", ""))
-    if not ok:
-        flash(f"其他支出：{err}", "error")
-        return redirect(url_for("reports.roi"))
-    f.entry_type = etype
-    f.amount = val
-    f.description = request.form.get("description", "").strip() or None
-    db.commit()
-    flash(f"其他支出「{etype}」已更新（{val:.2f}）", "ok")
-    return redirect(url_for("reports.roi"))
-
-
-@reports_bp.route("/roi/other/<int:fid>/delete", methods=["POST"])
-@role_required("owner", "accounting")
-def roi_other_delete(fid):
-    """刪除一筆其他支出（限 financial_entries 已知四類之外）。"""
-    db = get_session()
-    f = db.query(FinancialEntry).get(fid)
-    if not f or f.entry_type in KNOWN_ENTRY_TYPES:
-        abort(404)
-    et = f.entry_type
-    db.delete(f)
-    db.commit()
-    flash(f"其他支出「{et}」已刪除", "ok")
-    return redirect(url_for("reports.roi"))
+    flash(f"支出「{nm}」已刪除", "ok")
+    return redirect(url_for("reports.expenses"))
 
 
 # =========================================================================

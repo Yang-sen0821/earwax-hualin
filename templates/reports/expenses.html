@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}支出管理 — Flora Court ERP{% endblock %}
+{% block content %}
+{% include "products/_style.html" %}
+{% include "products/_flash.html" %}
+
+<style>
+  .exp-total { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px 24px;
+               max-width:420px; margin:0 0 24px; }
+  .exp-total .v { font-size:30px; font-weight:800; color:var(--fc); }
+  .exp-total .l { color:#8a8378; font-size:14px; margin-top:2px; }
+  .cat-block { margin-bottom:26px; }
+  .cat-head { display:flex; align-items:baseline; justify-content:space-between;
+              border-bottom:2px solid var(--line); padding-bottom:6px; margin-bottom:10px; }
+  .cat-head h3 { margin:0; font-size:17px; }
+  .cat-sub { font-weight:700; color:var(--fc); font-variant-numeric:tabular-nums; }
+  table.tbl td.num, table.tbl th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .addbox { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:8px 0 28px; }
+  .addbox h3 { margin:0 0 12px; font-size:16px; }
+  .row-form { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0; }
+  .row-form input[type=text], .row-form input[type=number], .row-form input[type=date], .row-form select {
+      padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; background:#fff; }
+  .row-form input.nm { width:150px; }
+  .row-form input.amt { width:110px; text-align:right; }
+  .row-form input.note { width:160px; }
+  .roi-link { display:inline-block; margin-left:8px; font-size:13px; }
+</style>
+
+<div class="pg-head">
+  <h1>支出管理</h1>
+  <div>
+    <a class="btn" href="{{ url_for('reports.roi') }}">回 ROI 報表</a>
+  </div>
+</div>
+<p class="sub" style="margin-top:-8px;margin-bottom:18px;">
+  所有成本花費以品項列管，ROI／財務一律由此單一來源依類別自動加總。收入／已售／庫存維持唯讀自動，不在此編輯。
+</p>
+
+<div class="exp-total">
+  <div class="v">${{ '%.0f'|format(grand_total) }}</div>
+  <div class="l">總投入成本（全部支出加總）</div>
+</div>
+
+<div class="addbox">
+  <h3>＋ 新增支出品項</h3>
+  <form class="row-form" method="post" action="{{ url_for('reports.expense_add') }}">
+    <input class="nm" type="text" name="name" placeholder="品項名稱" required>
+    <select name="category" required>
+      <option value="">類別…</option>
+      {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select>
+    <span>$</span><input class="amt" type="number" step="any" min="0" name="amount" placeholder="金額" required>
+    <input type="date" name="expense_date">
+    <input class="note" type="text" name="note" placeholder="備註 / 廠商（選填）">
+    <button class="btn btn-primary btn-sm" type="submit">新增</button>
+  </form>
+</div>
+
+{% for g in groups %}
+<div class="cat-block">
+  <div class="cat-head">
+    <h3>{{ g.category }}</h3>
+    <span class="cat-sub">小計 ${{ '%.0f'|format(g.subtotal) }}</span>
+  </div>
+  {% if g.rows %}
+  <table class="tbl">
+    <thead>
+      <tr><th>品項</th><th class="num">金額</th><th>日期</th><th>備註</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for e in g.rows %}
+      <tr>
+        <td colspan="5">
+          <form class="row-form" method="post" action="{{ url_for('reports.expense_update', eid=e.id) }}">
+            <input class="nm" type="text" name="name" value="{{ e.name }}" required>
+            <select name="category" required>
+              {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c==e.category }}>{{ c }}</option>{% endfor %}
+            </select>
+            <span>$</span><input class="amt" type="number" step="any" min="0" name="amount" value="{{ '%.2f'|format(e.amount|float) }}" required>
+            <input type="date" name="expense_date" value="{{ e.expense_date.strftime('%Y-%m-%d') if e.expense_date else '' }}">
+            <input class="note" type="text" name="note" value="{{ e.note or '' }}" placeholder="備註">
+            <button class="btn btn-sm btn-primary" type="submit">存</button>
+          </form>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="5" style="border-top:none;padding-top:0;">
+          <form class="inline" method="post" action="{{ url_for('reports.expense_delete', eid=e.id) }}" onsubmit="return confirm('刪除支出「{{ e.name }}」？');">
+            <button class="btn btn-sm btn-danger" type="submit">刪除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="sub">此類別尚無支出。</p>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% endblock %}

@@ -11,31 +11,22 @@
 </style>
 
 <h2 style="margin-top:0;">財務報表</h2>
-<p class="formula">毛利 = 銷售金額 − 商品成本　｜　淨利 = 毛利 − 包材 − 行銷 − 其他支出<br>
-資料來源：financial_entries（分錄）＋ extra_expenses（其他支出）。成本為後台可調測試值。</p>
+<p class="formula">毛利 = 銷售金額 − 商品成本　｜　淨利 = 銷售金額 − 總投入成本<br>
+成本單一來源：<a href="{{ url_for('reports.expenses') }}">支出管理</a>（extra_expenses）依類別自動加總；收入維持訂單／分錄自動。</p>
 
 <table>
   <tbody>
     <tr><td>銷售金額</td><td class="num">${{ '%.2f'|format(fin.sales_amount) }}</td></tr>
-    <tr class="sub"><td>　− 商品成本</td><td class="num">${{ '%.2f'|format(fin.product_cost) }}</td></tr>
+    <tr class="sub"><td>　− 商品成本（面膜進貨成本）</td><td class="num">${{ '%.2f'|format(fin.product_cost) }}</td></tr>
     <tr class="result"><td>毛利</td><td class="num">${{ '%.2f'|format(fin.gross_profit) }}</td></tr>
     <tr class="sub"><td>　− 包材成本</td><td class="num">${{ '%.2f'|format(fin.packaging_cost) }}</td></tr>
     <tr class="sub"><td>　− 行銷成本</td><td class="num">${{ '%.2f'|format(fin.marketing_cost) }}</td></tr>
+    <tr class="sub"><td>　− 建檔費</td><td class="num">${{ '%.2f'|format(fin.setup_cost) }}</td></tr>
+    <tr class="sub"><td>　− 設備</td><td class="num">${{ '%.2f'|format(fin.equipment_cost) }}</td></tr>
     <tr class="sub"><td>　− 其他支出</td><td class="num">${{ '%.2f'|format(fin.other_expense) }}</td></tr>
     <tr class="result"><td>淨利</td><td class="num">${{ '%.2f'|format(fin.net_profit) }}</td></tr>
   </tbody>
 </table>
-
-{% if fin.other_entries %}
-<h3 style="margin-top:28px;">其他分錄</h3>
-<table>
-  <tbody>
-    {% for k, v in fin.other_entries.items() %}
-    <tr><td>{{ k }}</td><td class="num">${{ '%.2f'|format(v) }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
 
 <p class="muted" style="margin-top:20px;">
   {% if fin.sales_amount == fin.orders_total and fin.orders_total > 0 %}
