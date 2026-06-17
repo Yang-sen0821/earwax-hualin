@@ -36,6 +36,7 @@ from db import (
     HistoricalOrderImport, HistoricalOrderImportRow,
 )
 import inventory_service
+from display_labels import combo_label
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/orders")
 
@@ -45,6 +46,10 @@ WRITE_ROLES = ("staff",)
 # 狀態閉集（§二 orders 預設值對照；UI 下拉用）
 PAYMENT_STATUSES = ("unpaid", "paid", "refunded", "partial")
 SHIPPING_STATUSES = ("pending", "shipped", "delivered", "cancelled")
+
+# 建單品項單位閉集（新模型）：LOOSE=片(扣裸片池)、BOX=盒(扣盒裝池)。
+# combo_code 欄位沿用，存 LOOSE/BOX；數量=qty，金額=unit_price/subtotal（無 schema 變更）。
+UNIT_CODES = ("LOOSE", "BOX")
 
 
 # -------------------------------------------------------------------------
@@ -114,8 +119,7 @@ def new():
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
         products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
-        sales_plans=db.query(SalesPlan).filter_by(active=True).all(),
-        combo_codes=COMBO_CODES,
+        unit_codes=UNIT_CODES,
         form={},
     )
 
@@ -132,27 +136,29 @@ def _create_order(db):
     discount = _to_decimal(request.form.get("discount"), default=0)
 
     # 多品項：以平行陣列接收
+    # combo_codes 改存單位值 LOOSE/BOX；amounts = 該列實收金額（直接金額，非單價×數量）
     product_ids = request.form.getlist("item_product_id")
     combo_codes = request.form.getlist("item_combo_code")
     qtys = request.form.getlist("item_qty")
-    unit_prices = request.form.getlist("item_unit_price")
+    amounts = request.form.getlist("item_amount")
 
     rows = []
     for i in range(len(product_ids)):
         pid = _to_int(product_ids[i])
         combo = (combo_codes[i] if i < len(combo_codes) else "").strip()
         qty = _to_int(qtys[i] if i < len(qtys) else None)
-        price = _to_decimal(unit_prices[i] if i < len(unit_prices) else None, default=0)
+        amount = _to_decimal(amounts[i] if i < len(amounts) else None, default=0)
         if not pid or not combo:
             continue
-        if combo not in COMBO_CODES:
-            flash(f"無效的銷售組合：{combo}")
+        if combo not in UNIT_CODES:
+            flash(f"無效的品項單位：{combo}（限 片 / 盒）")
             return _redraw_form(db)
         if not qty or qty <= 0:
             flash("品項數量必須為正整數")
             return _redraw_form(db)
+        # 金額為該列實收金額（可折扣）；unit_price 與 subtotal 同存此金額（無 schema 變更）
         rows.append({"product_id": pid, "combo_code": combo, "qty": qty,
-                     "unit_price": price, "subtotal": price * qty})
+                     "unit_price": amount, "subtotal": amount})
 
     if not rows:
         flash("訂單至少需一個品項")
@@ -209,7 +215,7 @@ def _create_order(db):
                 # 任一品項缺貨 ⇒ 整張 rollback（§4.2）
                 db.rollback()
                 pname = _product_label(db, r["product_id"])
-                flash(f"庫存不足，整張訂單未建立：{pname} / {r['combo_code']} × {r['qty']}")
+                flash(f"庫存不足，整張訂單未建立：{pname} / {combo_label(r['combo_code'])} × {r['qty']}")
                 return _redraw_form(db)
 
         db.commit()
@@ -581,8 +587,7 @@ def _redraw_form(db):
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
         products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
-        sales_plans=db.query(SalesPlan).filter_by(active=True).all(),
-        combo_codes=COMBO_CODES,
+        unit_codes=UNIT_CODES,
         form=request.form,
     )
 

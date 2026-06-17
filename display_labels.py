@@ -10,8 +10,13 @@
 此處的 COMBO 僅為「查不到 DB 時的 fallback」，DB 有值時應優先採 DB（reports 已自行處理）。
 """
 
-# combo_code → 中文（fallback；DB sales_plans.name 為主）
+# combo_code → 中文
+# 新模型（建單只產生這兩個）：LOOSE=片、BOX=盒。
+# 舊 4-combo 對照保留相容，避免歷史資料顯示崩。
 COMBO_LABELS = {
+    "LOOSE": "片",
+    "BOX": "盒",
+    # ---- 舊 4-combo 相容（歷史資料）----
     "SINGLE": "單片體驗組",
     "BOX1": "經典盒裝",
     "BOX3": "植萃養膚組",

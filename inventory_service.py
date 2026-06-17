@@ -64,6 +64,14 @@ _COMBO_MAP = {
     "BOX10":  ("boxed", 10),
 }
 
+# 新模型「單位」→ 池對應（每單位扣 1，量由 order_qty 決定）：
+#   LOOSE(片) → 裸片池、BOX(盒) → 盒裝池。
+# 舊的 4-combo 倍率(BOX3=3/BOX10=10)在新模型下由「盒 × 數量」自然取代。
+_UNIT_MAP = {
+    "LOOSE": ("loose_piece", 1),
+    "BOX":   ("boxed", 1),
+}
+
 
 # =========================================================================
 # 唯一 movement 寫入口（§4.8）
@@ -227,18 +235,24 @@ def deduct_for_sale(session, product_id, combo_code, order_qty,
                     operator, order_ref, note=""):
     """銷售扣減（§4.1）。
 
-    映射鎖定：SINGLE→(loose_piece,1)/BOX1→(boxed,1)/BOX3→(boxed,3)/BOX10→(boxed,10)。
-    只讀 normal，永不觸 reserved/pr/trial/scrap；兩池不互換。
-    need = per_unit(combo) * order_qty；缺貨 ⇒ ok=false、不扣不留痕（呼叫端 rollback）。
+    新模型「單位 + 數量」（建單只用這兩個）：
+      LOOSE(片) → 扣裸片池 × order_qty、BOX(盒) → 扣盒裝池 × order_qty。
+    舊 4-combo 相容（歷史 / 既有呼叫）：
+      SINGLE→(loose_piece,1)/BOX1→(boxed,1)/BOX3→(boxed,3)/BOX10→(boxed,10)。
+    只讀 normal，永不觸 reserved/pr/trial/scrap；兩池不互換（R1 紅線不變）。
+    need = per_unit(combo/unit) * order_qty；缺貨 ⇒ ok=false、不扣不留痕（呼叫端 rollback）。
     """
-    if combo_code not in _COMBO_MAP:
+    if combo_code in _UNIT_MAP:
+        pool, per_unit = _UNIT_MAP[combo_code]
+    elif combo_code in _COMBO_MAP:
+        pool, per_unit = _COMBO_MAP[combo_code]
+    else:
         return Result(ok=False, error=f"非法 combo_code: {combo_code}")
     if order_qty is None or order_qty <= 0:
         return Result(ok=False, error="order_qty 必須 > 0")
     if not operator:
         return Result(ok=False, error="operator 不可空")
 
-    pool, per_unit = _COMBO_MAP[combo_code]
     need = per_unit * order_qty
     category = "normal"  # 永遠只讀 normal（reserved 硬隔離）
 

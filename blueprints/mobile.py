@@ -29,6 +29,7 @@ from db import (
     INVENTORY_POOLS, COMBO_CODES,
 )
 import inventory_service
+from display_labels import combo_label
 
 mobile_bp = Blueprint("mobile", __name__, url_prefix="/m")
 
@@ -38,6 +39,9 @@ mobile_bp = Blueprint("mobile", __name__, url_prefix="/m")
 # owner 由 role_required 永遠通過；viewer / accounting 唯讀（被擋 403）。
 ORDER_WRITE_ROLES = ("staff",)
 SHIPMENT_WRITE_ROLES = ("staff", "warehouse")
+
+# 建單品項單位閉集（新模型，對齊桌面 orders）：LOOSE=片(扣裸片池)/BOX=盒(扣盒裝池)。
+UNIT_CODES = ("LOOSE", "BOX")
 
 
 # -------------------------------------------------------------------------
@@ -60,6 +64,19 @@ def _gen_order_no(db):
         except (ValueError, TypeError):
             seq = 1
     return f"{prefix}{seq:04d}"
+
+
+def _parse_money(raw):
+    """解析金額字串為 Decimal；空/非數值/負數一律回 0（建單金額可填可不填）。"""
+    from decimal import Decimal, InvalidOperation
+    raw = (raw or "").strip()
+    if not raw:
+        return Decimal("0")
+    try:
+        v = Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+    return v if v >= 0 else Decimal("0")
 
 
 def _result_ok(result):
@@ -179,23 +196,26 @@ def order_new():
         customer_id_raw = (request.form.get("customer_id") or "").strip()
         customer_id = int(customer_id_raw) if customer_id_raw.isdigit() else None
 
-        # 解析多品項：product_id[]、combo_code[]、qty[]
+        # 解析多品項：product_id[]、combo_code[]（單位 LOOSE/BOX）、qty[]、amount[]（實收金額）
         product_ids = request.form.getlist("product_id")
         combo_codes = request.form.getlist("combo_code")
         qtys = request.form.getlist("qty")
+        amounts = request.form.getlist("amount")
 
         line_items = []
-        for pid_s, combo, qty_s in zip(product_ids, combo_codes, qtys):
+        for i, (pid_s, combo, qty_s) in enumerate(zip(product_ids, combo_codes, qtys)):
             pid_s, combo, qty_s = pid_s.strip(), combo.strip(), qty_s.strip()
+            amt_s = (amounts[i].strip() if i < len(amounts) else "")
             if not pid_s and not qty_s:
                 continue  # 跳過空白列
             if not (pid_s.isdigit() and qty_s.isdigit() and int(qty_s) > 0):
                 flash("品項資料不完整或數量無效")
                 return _render_order_new(db)
-            if combo not in COMBO_CODES:
-                flash(f"無效的銷售組合：{combo}")
+            if combo not in UNIT_CODES:
+                flash(f"無效的品項單位：{combo}（限 片 / 盒）")
                 return _render_order_new(db)
-            line_items.append((int(pid_s), combo, int(qty_s)))
+            amount = _parse_money(amt_s)
+            line_items.append((int(pid_s), combo, int(qty_s), amount))
 
         if not line_items:
             flash("請至少新增一個品項")
@@ -219,14 +239,8 @@ def order_new():
             db.add(order)
             db.flush()  # 取得 order.id，供 movement ref_id / order_items 使用
 
-            # 價格對照（sales_plans）
-            price_map = {
-                sp.combo_code: (sp.price or 0)
-                for sp in db.query(SalesPlan).all()
-            }
-
             total = 0
-            for pid, combo, qty in line_items:
+            for pid, combo, qty, amount in line_items:
                 # 庫存扣減：唯一寫入口 = inventory_service（R1 / §4.1）
                 result = inventory_service.deduct_for_sale(
                     db, product_id=pid, combo_code=combo, order_qty=qty,
@@ -238,20 +252,19 @@ def order_new():
                     prod = db.query(Product).filter_by(id=pid).first()
                     pname = prod.name if prod else f"#{pid}"
                     extra = _result_msg(result)
-                    flash(f"庫存不足，整張訂單未建立：{pname} / {combo}"
+                    flash(f"庫存不足，整張訂單未建立：{pname} / {combo_label(combo)}"
                           + (f"（{extra}）" if extra else ""))
                     return _render_order_new(db)
 
-                unit_price = price_map.get(combo, 0)
-                subtotal = unit_price * qty
-                total += subtotal
+                # 金額為該列實收金額（可折扣）；unit_price 與 subtotal 同存此金額（無 schema 變更）
+                total += amount
                 db.add(OrderItem(
                     order_id=order.id,
                     product_id=pid,
                     combo_code=combo,
                     qty=qty,
-                    unit_price=unit_price,
-                    subtotal=subtotal,
+                    unit_price=amount,
+                    subtotal=amount,
                 ))
 
             order.total_amount = total
@@ -276,11 +289,10 @@ def _render_order_new(db):
         .order_by(Product.name)
         .all()
     )
-    plans = db.query(SalesPlan).filter(SalesPlan.active == True).all()  # noqa: E712
     return render_template(
         "mobile/order_new.html", section="mobile", user=current_user(),
-        customers=customers, products=products, plans=plans,
-        combo_codes=COMBO_CODES,
+        customers=customers, products=products,
+        unit_codes=UNIT_CODES,
     )
 
 
