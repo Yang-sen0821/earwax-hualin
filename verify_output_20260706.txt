@@ -1,0 +1,30 @@
+連線目標 host：aws-1-ap-northeast-1.pooler.supabase.com（唯讀查詢）
+
+== flora_court.inventory_balances（線上現值）==
+  [1] 華苑 Flora Court 植萃全方位面膜 boxed/normal qty=216 updated=2026-07-06 13:33:49.407972
+  [2] 華苑 Flora Court 植萃全方位面膜 boxed/reserved qty=35 updated=2026-06-17 12:08:07.403347
+  [3] 華苑 Flora Court 植萃全方位面膜 loose_piece/normal qty=1360 updated=2026-07-06 13:33:49.602051
+  [4] 包材-共用 paper_bag/normal qty=527 updated=2026-07-06 13:33:49.777558
+
+== flora_court.inventory_movements（movement_id>=5）==
+  [5] boxed 1271->216 ADJUSTMENT reason=115/7/3 客戶盤點：盒裝總數251（13箱79盒+1箱53盒+1箱76盒=208＋散盒43）；盤點未分類，reserved 35 保留，normal 調為 at=2026-07-06 13:33:49.460976
+  [6] loose_piece 1825->1360 ADJUSTMENT reason=115/7/3 客戶盤點：片裝 3箱500片+1箱460片=960＋散片400=1360 at=2026-07-06 13:33:49.645775
+  [7] paper_bag 932->527 ADJUSTMENT reason=115/7/3 客戶盤點：袋 3箱200只+1箱155只+1箱63只=418＋散裝109=527 at=2026-07-06 13:33:49.820557
+
+== earwax.consumables（線上現值）==
+  [1] (consumable) 針筒 qty=3 note=115/7/3 客戶盤點（手寫，僅限於櫃內）原文：針管3支；以既有針筒品名入帳
+  [2] (consumable) 耳塞 qty=0 note=
+  [3] (consumable) 安瓶 qty=0 note=
+  [4] (consumable) 洗卸品 qty=0 note=
+  [5] (consumable) 洗臉巾 qty=0 note=
+  [6] (consumable) 防曬 qty=0 note=
+  [7] (equipment) 導入儀 qty=0 note=
+  [8] (equipment) 氣壓儀器 qty=0 note=
+  [9] (equipment) 頭皮臉部偵測儀 qty=0 note=
+  [10] (equipment) 台車 qty=0 note=
+  [11] (equipment) 破壁機 qty=0 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：1盒+6包，其中1盒不確定是誰的，未計入庫存
+  [12] (consumable) 銀 qty=1 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：銀=1盒+4；單位=盒，散4未併入qty
+  [13] (consumable) 藍 qty=2 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：藍=2瓶；單位=瓶
+  [14] (consumable) 粉 qty=1 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：粉=1盒；單位=盒
+  [15] (consumable) 綠 qty=5 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：綠=5瓶；單位=瓶
+  [16] (consumable) 桃麗 qty=7 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：桃麗=7組；單位=組；品名字跡待客戶確認

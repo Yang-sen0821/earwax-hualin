@@ -1,0 +1,79 @@
+[
+ {
+  "id": 1,
+  "category": "consumable",
+  "name": "針筒",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 2,
+  "category": "consumable",
+  "name": "耳塞",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 3,
+  "category": "consumable",
+  "name": "安瓶",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 4,
+  "category": "consumable",
+  "name": "洗卸品",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 5,
+  "category": "consumable",
+  "name": "洗臉巾",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 6,
+  "category": "consumable",
+  "name": "防曬",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 7,
+  "category": "equipment",
+  "name": "導入儀",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 8,
+  "category": "equipment",
+  "name": "氣壓儀器",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 9,
+  "category": "equipment",
+  "name": "頭皮臉部偵測儀",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 10,
+  "category": "equipment",
+  "name": "台車",
+  "qty_on_hand": 0,
+  "note": ""
+ },
+ {
+  "id": 11,
+  "category": "equipment",
+  "name": "破壁機",
+  "qty_on_hand": 0,
+  "note": ""
+ }
+]

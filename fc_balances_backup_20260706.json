@@ -1,0 +1,38 @@
+[
+ {
+  "id": 1,
+  "product_id": 1,
+  "product": "華苑 Flora Court 植萃全方位面膜",
+  "pool": "boxed",
+  "category": "normal",
+  "qty": 1271,
+  "unit": "box"
+ },
+ {
+  "id": 2,
+  "product_id": 1,
+  "product": "華苑 Flora Court 植萃全方位面膜",
+  "pool": "boxed",
+  "category": "reserved",
+  "qty": 35,
+  "unit": "box"
+ },
+ {
+  "id": 3,
+  "product_id": 1,
+  "product": "華苑 Flora Court 植萃全方位面膜",
+  "pool": "loose_piece",
+  "category": "normal",
+  "qty": 1825,
+  "unit": "piece"
+ },
+ {
+  "id": 4,
+  "product_id": 2,
+  "product": "包材-共用",
+  "pool": "paper_bag",
+  "category": "normal",
+  "qty": 932,
+  "unit": "bag"
+ }
+]
