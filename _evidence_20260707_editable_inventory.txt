@@ -1,0 +1,19 @@
+# 證據檔 2026-07-07：庫存區全面可編輯（含品名）驗證輸出
+
+## earwax_edit_test.py（handler 級，throwaway sqlite + EARWAX_TABLE 同構表）
+[PASS] 1) owner 看到愛啪啪區與品項  status=200
+[PASS] 2) 編輯寫入生效  row=('銀安瓶', 5, 12.5, '改測')
+[PASS] 3) audit_logs 留痕 edit  count=1
+[PASS] 4) 新增品項 + audit 留痕  rows=2 create_audit=1
+[PASS] 5) 負數量/空品名被擋、原值不動  row=('銀安瓶', 5)
+[PASS] 6) staff 編輯被擋(403)且值不動  status=403 row=('銀安瓶', 5)
+結果：6/6 PASS
+
+## 既有 e2e 重跑
+�ݨ�ݵ��G�G12/13 PASS
+  FAIL �� 8) �]�Ȥ�Q/�b�Q����
+============================================================
+
+## adjust 預填/連結 smoke（本輪輸出）
+adjust prefill: 200 True True True
+矩陣數字連結: True / 編輯品名連結: True

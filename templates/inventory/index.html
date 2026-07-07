@@ -11,12 +11,16 @@
 
   <h2 style="margin:14px 0 6px; font-size:19px;">面膜（Flora Court）</h2>
   <p class="muted">三池（盒裝 / 裸片 / 紙袋）× 5 分類（正常 / 預留 / 公關品 / 試用品 / 損耗報廢）。
-     預留為物理分列，一般銷售取不到。</p>
+     預留為物理分列，一般銷售取不到。
+     {% if is_owner %}點表格數字可開「調整單」改數量（留痕）；「編輯品名」可改商品名稱。{% endif %}</p>
 
   {% for p in products %}
     <div style="margin-bottom:28px;">
       <h3 style="margin:0 0 8px;">{{ p.name }}
         <span class="muted" style="font-size:13px; font-weight:400;">（{{ p.sku }}{% if p.is_packaging %}・包材{% endif %}）</span>
+        {% if is_owner %}
+          <a href="{{ url_for('products.edit', pid=p.id) }}" style="font-size:12px; font-weight:400; margin-left:6px;">編輯品名</a>
+        {% endif %}
       </h3>
       <div style="overflow-x:auto;">
       <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:14px;">
@@ -43,7 +47,14 @@
               <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;
                 {% if c == 'reserved' %}background:#f6f2ff;{% endif %}
                 {% if v is none %}color:#bbb;{% endif %}">
-                {{ v if v is not none else '—' }}
+                {% if is_owner %}
+                  <a href="{{ url_for('inventory.adjust', product_id=p.id, pool=pool, category=c) }}"
+                     title="點擊調整此格數量（走調整單留痕）" style="text-decoration:underline dotted; color:inherit;">
+                    {{ v if v is not none else '—' }}
+                  </a>
+                {% else %}
+                  {{ v if v is not none else '—' }}
+                {% endif %}
               </td>
             {% endfor %}
           </tr>
@@ -65,38 +76,101 @@
 
   <hr style="border:none; border-top:1px solid #e5e0d8; margin:26px 0 18px;">
   <h2 style="margin:0 0 6px; font-size:19px;">愛啪啪</h2>
-  <p class="muted">唯讀顯示；異動管理在愛啪啪系統，此處不提供修改。</p>
+  {% if can_write %}
+    <p class="muted">各欄位可直接修改後按「儲存」；最下方可新增品項。每次修改都會留存紀錄。</p>
+  {% else %}
+    <p class="muted">唯讀顯示；編輯需 owner／倉管權限。</p>
+  {% endif %}
   {% if earwax_error %}
     <p style="color:#a33;">愛啪啪庫存讀取失敗，請重新整理；持續失敗請通知管理員。</p>
   {% elif earwax_items is none %}
     <p class="muted">（本機測試模式不顯示愛啪啪庫存）</p>
-  {% elif earwax_items %}
+  {% else %}
     <div style="overflow-x:auto;">
-    <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:14px;">
+    <table style="border-collapse:collapse; width:100%; min-width:640px; font-size:14px;">
       <thead>
         <tr style="background:#faf8f5;">
           <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">類別</th>
           <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">品名</th>
           <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">數量</th>
+          <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">單位成本</th>
           <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">備註</th>
+          {% if can_write %}<th style="padding:8px 10px; border:1px solid #e5e0d8;">操作</th>{% endif %}
         </tr>
       </thead>
       <tbody>
         {% for row in earwax_items %}
         <tr>
+          {% if can_write %}
+          <td style="padding:6px 8px; border:1px solid #e5e0d8;">
+            <select name="category" form="ew-edit-{{ row.id }}" style="padding:6px;">
+              <option value="consumable" {% if row.category == 'consumable' %}selected{% endif %}>消耗品</option>
+              <option value="equipment" {% if row.category == 'equipment' %}selected{% endif %}>儀器設備</option>
+            </select>
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8;">
+            <input type="text" name="name" form="ew-edit-{{ row.id }}" value="{{ row.name }}" required style="width:110px; padding:6px;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8; text-align:right;">
+            <input type="number" name="qty_on_hand" form="ew-edit-{{ row.id }}" value="{{ row.qty_on_hand }}" min="0" required style="width:80px; padding:6px; text-align:right;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8; text-align:right;">
+            <input type="number" name="unit_cost" form="ew-edit-{{ row.id }}" value="{{ row.unit_cost or 0 }}" min="0" step="0.01" style="width:90px; padding:6px; text-align:right;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8;">
+            <input type="text" name="note" form="ew-edit-{{ row.id }}" value="{{ row.note }}" style="width:100%; min-width:180px; padding:6px;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8; text-align:center;">
+            <button type="submit" form="ew-edit-{{ row.id }}" style="background:#7a6f63; color:#fff; border:none; padding:7px 14px; border-radius:6px; cursor:pointer;">儲存</button>
+          </td>
+          {% else %}
           <td style="padding:8px 10px; border:1px solid #e5e0d8;">
             {{ '消耗品' if row.category == 'consumable' else '儀器設備' if row.category == 'equipment' else row.category }}
           </td>
           <td style="padding:8px 10px; border:1px solid #e5e0d8; font-weight:600;">{{ row.name }}</td>
           <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ row.qty_on_hand }}</td>
+          <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ row.unit_cost or 0 }}</td>
           <td style="padding:8px 10px; border:1px solid #e5e0d8; color:#6b6259;">{{ row.note }}</td>
+          {% endif %}
         </tr>
         {% endfor %}
+        {% if not earwax_items %}
+        <tr><td colspan="{{ 6 if can_write else 5 }}" style="padding:10px; border:1px solid #e5e0d8;" class="muted">愛啪啪目前沒有庫存品項。</td></tr>
+        {% endif %}
+        {% if can_write %}
+        <tr style="background:#faf8f5;">
+          <td style="padding:6px 8px; border:1px solid #e5e0d8;">
+            <select name="category" form="ew-new" style="padding:6px;">
+              <option value="consumable" selected>消耗品</option>
+              <option value="equipment">儀器設備</option>
+            </select>
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8;">
+            <input type="text" name="name" form="ew-new" placeholder="新品項名稱" required style="width:110px; padding:6px;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8; text-align:right;">
+            <input type="number" name="qty_on_hand" form="ew-new" value="0" min="0" style="width:80px; padding:6px; text-align:right;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8; text-align:right;">
+            <input type="number" name="unit_cost" form="ew-new" value="0" min="0" step="0.01" style="width:90px; padding:6px; text-align:right;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8;">
+            <input type="text" name="note" form="ew-new" placeholder="備註（選填）" style="width:100%; min-width:180px; padding:6px;">
+          </td>
+          <td style="padding:6px 8px; border:1px solid #e5e0d8; text-align:center;">
+            <button type="submit" form="ew-new" style="background:#fff; color:#2b2b2b; border:1px solid #7a6f63; padding:7px 14px; border-radius:6px; cursor:pointer;">新增</button>
+          </td>
+        </tr>
+        {% endif %}
       </tbody>
     </table>
     </div>
-  {% else %}
-    <p class="muted">愛啪啪目前沒有庫存品項。</p>
+    {% if can_write %}
+      {% for row in earwax_items %}
+      <form id="ew-edit-{{ row.id }}" method="post" action="{{ url_for('inventory.earwax_edit', cid=row.id) }}"></form>
+      {% endfor %}
+      <form id="ew-new" method="post" action="{{ url_for('inventory.earwax_new') }}"></form>
+    {% endif %}
   {% endif %}
 </div>
 {% endblock %}

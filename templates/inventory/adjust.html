@@ -14,17 +14,17 @@
   <form method="post" style="display:flex; flex-direction:column; gap:14px;">
     <label>商品
       <select name="product_id" required style="width:100%; padding:8px; margin-top:4px;">
-        {% for p in products %}<option value="{{ p.id }}">{{ p.name }}（{{ p.sku }}）</option>{% endfor %}
+        {% for p in products %}<option value="{{ p.id }}" {% if prefill.product_id == p.id|string %}selected{% endif %}>{{ p.name }}（{{ p.sku }}）</option>{% endfor %}
       </select>
     </label>
     <label>庫存池
       <select name="inventory_pool" required style="width:100%; padding:8px; margin-top:4px;">
-        {% for pool in pools %}<option value="{{ pool }}">{{ pool_labels[pool] }}</option>{% endfor %}
+        {% for pool in pools %}<option value="{{ pool }}" {% if prefill.pool == pool %}selected{% endif %}>{{ pool_labels[pool] }}</option>{% endfor %}
       </select>
     </label>
     <label>分類
       <select name="stock_category" style="width:100%; padding:8px; margin-top:4px;">
-        {% for c in cats %}<option value="{{ c }}" {% if c=='normal' %}selected{% endif %}>{{ cat_labels[c] }}</option>{% endfor %}
+        {% for c in cats %}<option value="{{ c }}" {% if (prefill.category and prefill.category == c) or (not prefill.category and c == 'normal') %}selected{% endif %}>{{ cat_labels[c] }}</option>{% endfor %}
       </select>
     </label>
     <label>盤點後目標數量

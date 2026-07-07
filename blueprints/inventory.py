@@ -14,6 +14,10 @@
 鐵律：任何改庫存量一律呼叫 inventory_service 的契約函式；本檔禁止自寫
 inventory_balances / inventory_movements。session commit/rollback 在本層管理（同一 tx）。
 """
+import json
+import os
+from datetime import datetime
+
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, abort,
 )
@@ -23,7 +27,7 @@ from auth import login_required, role_required, current_user
 from config import Config
 from db import (
     get_session, Product, InventoryBalance, InventoryMovement,
-    InventoryThreshold,
+    InventoryThreshold, AuditLog,
     INVENTORY_POOLS, STOCK_CATEGORIES, MOVEMENT_TYPES,
 )
 import inventory_service as inv
@@ -31,6 +35,16 @@ import inventory_service as inv
 from display_labels import POOL_LABELS, CAT_LABELS, MTYPE_LABELS
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
+
+# 愛啪啪耗材表（R2 邊界：不 import earwax model、不建 FK，僅參數化 raw SQL）。
+# EARWAX_TABLE 為固定常數/測試 env 覆寫，非使用者輸入，無注入面。
+EARWAX_TABLE = os.environ.get("EARWAX_TABLE", "earwax.consumables")
+EARWAX_CATEGORIES = ("consumable", "equipment")
+
+
+def _earwax_enabled():
+    """正式 Postgres 一律啟用；本機 SQLite 僅在測試以 EARWAX_TABLE 指向同構表時啟用。"""
+    return (not Config.is_sqlite()) or bool(os.environ.get("EARWAX_TABLE"))
 # 出庫類（§4.6 通用出庫）
 OUT_TYPES = ["GIFT", "TRIAL", "PR", "KOL_SAMPLE", "STAFF_USE",
              "INSTORE_USE", "SCRAP_LOSS", "SCRAP"]
@@ -73,28 +87,122 @@ def index():
             if r.low_water:
                 low_map.setdefault(p.id, {})[pool] = r.threshold
 
-    # 愛啪啪庫存唯讀顯示（森哥 2026-07-07：庫存頁分區顯示面膜與愛啪啪）
-    # R2 邊界：不 import earwax model、不建 cross-schema FK、僅 raw SQL 唯讀；異動管理仍在愛啪啪系統
+    # 愛啪啪庫存區（森哥 2026-07-07：庫存頁分區顯示；同日升級為可編輯，含品名）
+    # R2 邊界：不 import earwax model、不建 cross-schema FK、僅參數化 raw SQL
     earwax_items = None
     earwax_error = False
-    if not Config.is_sqlite():
+    if _earwax_enabled():
         try:
             earwax_items = db.execute(text(
-                "SELECT category, name, qty_on_hand, COALESCE(note, '') AS note "
-                "FROM earwax.consumables ORDER BY category, id"
+                f"SELECT id, category, name, qty_on_hand, unit_cost, COALESCE(note, '') AS note "
+                f"FROM {EARWAX_TABLE} ORDER BY category, id"
             )).mappings().all()
         except Exception:
             db.rollback()
             earwax_error = True
 
+    u = current_user()
     return render_template(
         "inventory/index.html", section="inventory",
         products=products, bal_map=bal_map, low_map=low_map,
         pools=INVENTORY_POOLS, cats=STOCK_CATEGORIES,
         pool_labels=POOL_LABELS, cat_labels=CAT_LABELS,
         can_write=_can_write(),
+        is_owner=(u is not None and u.role == "owner"),
         earwax_items=earwax_items, earwax_error=earwax_error,
     )
+
+
+# =========================================================================
+# 愛啪啪耗材編輯 / 新增（森哥 2026-07-07 授權；owner/warehouse；audit_logs 留痕）
+# =========================================================================
+def _earwax_form_values():
+    """共用表單驗證：回 (values, error)。"""
+    name = request.form.get("name", "").strip()
+    category = request.form.get("category", "consumable").strip()
+    note = request.form.get("note", "").strip()
+    try:
+        qty = int(request.form.get("qty_on_hand", "0"))
+        unit_cost = float(request.form.get("unit_cost", "0") or 0)
+    except ValueError:
+        return None, "數量／單位成本格式錯誤"
+    if not name:
+        return None, "品名不可空白"
+    if qty < 0:
+        return None, "數量不可為負"
+    if unit_cost < 0:
+        return None, "單位成本不可為負"
+    if category not in EARWAX_CATEGORIES:
+        return None, "類別不合法"
+    return {"name": name, "category": category, "qty_on_hand": qty,
+            "unit_cost": unit_cost, "note": note}, None
+
+
+def _audit(db, action, target_id, detail_obj):
+    u = current_user()
+    db.add(AuditLog(
+        actor_id=(u.id if u else None), actor_name=_operator_name(),
+        action=action, target_type="earwax.consumables",
+        target_id=str(target_id),
+        detail=json.dumps(detail_obj, ensure_ascii=False, default=str),
+    ))
+
+
+@inventory_bp.route("/earwax/<int:cid>/edit", methods=["POST"])
+@role_required("owner", "warehouse")
+def earwax_edit(cid):
+    if not _earwax_enabled():
+        abort(404)
+    db = get_session()
+    values, err = _earwax_form_values()
+    if err:
+        flash(f"愛啪啪品項未更新：{err}", "error")
+        return redirect(url_for("inventory.index"))
+    before = db.execute(text(
+        f"SELECT category, name, qty_on_hand, unit_cost, COALESCE(note,'') AS note "
+        f"FROM {EARWAX_TABLE} WHERE id = :cid"), {"cid": cid}).mappings().first()
+    if before is None:
+        flash("找不到該愛啪啪品項", "error")
+        return redirect(url_for("inventory.index"))
+    try:
+        db.execute(text(
+            f"UPDATE {EARWAX_TABLE} SET category=:category, name=:name, "
+            f"qty_on_hand=:qty_on_hand, unit_cost=:unit_cost, note=:note "
+            f"WHERE id=:cid"), {**values, "cid": cid})
+        _audit(db, "earwax_consumable_edit", cid,
+               {"before": dict(before), "after": values})
+        db.commit()
+    except Exception:
+        db.rollback()
+        flash("愛啪啪品項更新失敗（資料庫錯誤）", "error")
+        return redirect(url_for("inventory.index"))
+    flash(f"愛啪啪品項「{values['name']}」已更新", "ok")
+    return redirect(url_for("inventory.index"))
+
+
+@inventory_bp.route("/earwax/new", methods=["POST"])
+@role_required("owner", "warehouse")
+def earwax_new():
+    if not _earwax_enabled():
+        abort(404)
+    db = get_session()
+    values, err = _earwax_form_values()
+    if err:
+        flash(f"愛啪啪品項未新增：{err}", "error")
+        return redirect(url_for("inventory.index"))
+    try:
+        new_id = db.execute(text(
+            f"INSERT INTO {EARWAX_TABLE} (category, name, qty_on_hand, unit_cost, note, created_at) "
+            f"VALUES (:category, :name, :qty_on_hand, :unit_cost, :note, :ts) RETURNING id"),
+            {**values, "ts": datetime.utcnow()}).scalar()
+        _audit(db, "earwax_consumable_create", new_id, {"after": values})
+        db.commit()
+    except Exception:
+        db.rollback()
+        flash("愛啪啪品項新增失敗（資料庫錯誤）", "error")
+        return redirect(url_for("inventory.index"))
+    flash(f"愛啪啪品項「{values['name']}」已新增", "ok")
+    return redirect(url_for("inventory.index"))
 
 
 # =========================================================================
@@ -255,8 +363,14 @@ def adjust():
         flash(f"調整失敗：{res.error}", "error")
         return redirect(url_for("inventory.adjust"))
 
+    # GET 預填（庫存總覽格子點進來帶 product_id/pool/category；POST 邏輯不受影響）
+    prefill = {
+        "product_id": request.args.get("product_id", ""),
+        "pool": request.args.get("pool", ""),
+        "category": request.args.get("category", ""),
+    }
     return render_template(
-        "inventory/adjust.html", section="inventory",
+        "inventory/adjust.html", section="inventory", prefill=prefill,
         products=products, pools=INVENTORY_POOLS, cats=STOCK_CATEGORIES,
         pool_labels=POOL_LABELS, cat_labels=CAT_LABELS, bal_map=bal_map,
     )

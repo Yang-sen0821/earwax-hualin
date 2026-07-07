@@ -1,0 +1,28 @@
+# 證據檔 2026-07-07：庫存頁雙區顯示（面膜/愛啪啪）驗證輸出
+
+## git log/push（本機 ref）
+aaca7e2 庫存頁分區顯示：面膜(Flora Court)三池矩陣 + 愛啪啪耗材唯讀區(raw SQL跨schema唯讀,R2不建FK不import model)
+dcbcc48 docs: 部署計畫更新(森哥裁決) + Render部署參數 + 單元測試 + 115/7/3盤點輸入證據(備份/驗證輸出)
+* main aaca7e2 庫存頁分區顯示：面膜(Flora Court)三池矩陣 + 愛啪啪耗材唯讀區(raw SQL跨schema唯讀,R2不建FK不import model)
+push 輸出（session 記錄）: dcbcc48..aaca7e2  main -> flora-court
+
+## 本輪 e2e 重跑（throwaway sqlite）
+============================================================
+�ݨ�ݵ��G�G12/13 PASS
+  FAIL �� 8) �]�Ȥ�Q/�b�Q����
+============================================================
+
+## test client /inventory/（本輪重跑）
+status: 200
+面膜 section: True
+愛啪啪 section: True
+sqlite skip note: True
+
+## 線上 DB 唯讀查詢（程式同句 SQL，本輪重跑）
+16 列
+  consumable 針筒 3
+  consumable 耳塞 0
+  consumable 安瓶 0
+  consumable 洗卸品 0
+  consumable 洗臉巾 0
+  consumable 防曬 0
