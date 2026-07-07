@@ -17,8 +17,10 @@ inventory_balances / inventory_movements。session commit/rollback 在本層管�
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, abort,
 )
+from sqlalchemy import text
 
 from auth import login_required, role_required, current_user
+from config import Config
 from db import (
     get_session, Product, InventoryBalance, InventoryMovement,
     InventoryThreshold,
@@ -71,12 +73,27 @@ def index():
             if r.low_water:
                 low_map.setdefault(p.id, {})[pool] = r.threshold
 
+    # 愛啪啪庫存唯讀顯示（森哥 2026-07-07：庫存頁分區顯示面膜與愛啪啪）
+    # R2 邊界：不 import earwax model、不建 cross-schema FK、僅 raw SQL 唯讀；異動管理仍在愛啪啪系統
+    earwax_items = None
+    earwax_error = False
+    if not Config.is_sqlite():
+        try:
+            earwax_items = db.execute(text(
+                "SELECT category, name, qty_on_hand, COALESCE(note, '') AS note "
+                "FROM earwax.consumables ORDER BY category, id"
+            )).mappings().all()
+        except Exception:
+            db.rollback()
+            earwax_error = True
+
     return render_template(
         "inventory/index.html", section="inventory",
         products=products, bal_map=bal_map, low_map=low_map,
         pools=INVENTORY_POOLS, cats=STOCK_CATEGORIES,
         pool_labels=POOL_LABELS, cat_labels=CAT_LABELS,
         can_write=_can_write(),
+        earwax_items=earwax_items, earwax_error=earwax_error,
     )
 
 

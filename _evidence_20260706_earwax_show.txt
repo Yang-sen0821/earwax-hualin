@@ -1,0 +1,20 @@
+# 證據檔 2026-07-06（愛啪啪重新顯示評估）
+
+## git ls-remote --heads origin（於 E:\AI-Wiki\Projects\earwax_hualin 執行）
+dcbcc4874440f385fc145f5f35935071d267d1bd	refs/heads/flora-court
+7bd5c50d625ad3d33e30b9d2ab0ec355dee0109e	refs/heads/main
+
+## earwax_hualin git status -sb
+## main...origin/main
+ M app.py
+ M config.py
+ M templates/base.html
+?? "FloraCourt_ERP_Cerberus\346\216\245\346\241\210_2026-06-17.md"
+?? "FloraCourt_ERP_\345\273\272\347\275\256\350\250\210\347\225\253_v2_2026-06-17.md"
+?? "FloraCourt_ERP_\345\273\272\347\275\256\350\250\210\347\225\253_\345\275\231\346\225\264_2026-06-17.md"
+
+## flora_court 本機 repo（HEAD 已推至 origin/flora-court）
+dcbcc48 docs: 部署計畫更新(森哥裁決) + Render部署參數 + 單元測試 + 115/7/3盤點輸入證據(備份/驗證輸出)
+49fd9dd 建單品項簡化為片/盒+數量自填，扣減直接對應裸片/盒裝池(R1不變)
+## main
+?? _evidence_20260706_earwax_show.txt
