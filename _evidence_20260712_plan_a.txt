@@ -18,3 +18,11 @@
   FAIL �� 8) �]�Ȥ�Q/�b�Q����
 ============================================================
 結果：6/6 PASS
+
+## 補測：staff /reports/expenses 403（本輪實跑）
+staff GET /reports/expenses = 403
+
+## 線上 DB 查證（本輪唯讀）
+flora_court 表數=21；earwax_sales 存在=True
+inventory_balances 現值（未動）=[('boxed', 'normal', 210), ('boxed', 'reserved', 35), ('loose_piece', 'normal', 1350), ('paper_bag', 'normal', 527)]
+staff 帳號=staff role=staff active=True（密碼 hash 已更新，值不記錄）
