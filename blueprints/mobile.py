@@ -323,9 +323,27 @@ def inventory():
         bucket["total"] += (r.qty or 0)
         bucket["rows"].append(r)
 
+    # 愛啪啪庫存（森哥 2026-07-12：手機版也要看得到；唯讀，編輯走桌面版庫存頁）
+    # R2 邊界同桌面版：不 import earwax model、不建 FK，僅參數化 raw SQL
+    from sqlalchemy import text
+
+    from blueprints.inventory import EARWAX_TABLE, _earwax_enabled
+    earwax_items = None
+    earwax_error = False
+    if _earwax_enabled():
+        try:
+            earwax_items = db.execute(text(
+                f"SELECT id, category, name, qty_on_hand, COALESCE(note, '') AS note "
+                f"FROM {EARWAX_TABLE} ORDER BY category, id"
+            )).mappings().all()
+        except Exception:
+            db.rollback()
+            earwax_error = True
+
     return render_template(
         "mobile/inventory.html", section="mobile", user=current_user(),
         pools=pools, prod_map=prod_map, pool_order=INVENTORY_POOLS,
+        earwax_items=earwax_items, earwax_error=earwax_error,
     )
 
 

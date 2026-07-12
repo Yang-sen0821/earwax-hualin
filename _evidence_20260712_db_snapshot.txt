@@ -1,0 +1,23 @@
+# 2026-07-12 線上庫存唯讀快照（對照 7/12 盤點用）
+== flora_court.inventory_balances ==
+  華苑 Flora Court 植萃全方位面膜 boxed/normal qty=216
+  華苑 Flora Court 植萃全方位面膜 boxed/reserved qty=35
+  華苑 Flora Court 植萃全方位面膜 loose_piece/normal qty=1360
+  包材-共用 paper_bag/normal qty=527
+== earwax.consumables ==
+  [1] (consumable) 針筒 qty=3 note=115/7/3 客戶盤點（手寫，僅限於櫃內）原文：針管3支；以既有針筒品名入帳
+  [2] (consumable) 耳塞 qty=0 note=
+  [3] (consumable) 安瓶 qty=0 note=
+  [4] (consumable) 洗卸品 qty=0 note=
+  [5] (consumable) 洗臉巾 qty=0 note=
+  [6] (consumable) 防曬 qty=0 note=
+  [7] (equipment) 導入儀 qty=0 note=
+  [8] (equipment) 氣壓儀器 qty=0 note=
+  [9] (equipment) 頭皮臉部偵測儀 qty=0 note=
+  [10] (equipment) 台車 qty=0 note=
+  [11] (equipment) 破壁機 qty=0 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：1盒+6包，其中1盒不確定是誰的，未計入庫存
+  [12] (consumable) 銀 qty=1 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：銀=1盒+4；單位=盒，散4未併入qty
+  [13] (consumable) 藍 qty=2 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：藍=2瓶；單位=瓶
+  [14] (consumable) 粉 qty=1 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：粉=1盒；單位=盒
+  [15] (consumable) 綠 qty=5 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：綠=5瓶；單位=瓶
+  [16] (consumable) 桃麗 qty=7 note=115/7/3 客戶盤點（手寫，僅限於櫃內）：桃麗=7組；單位=組；品名字跡待客戶確認

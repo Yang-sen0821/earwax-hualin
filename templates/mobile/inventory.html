@@ -26,4 +26,29 @@
     </div>
   {% endfor %}
   <div class="hint" style="text-align:center">預留(reserved)為硬隔離分列，一般銷售扣不到。</div>
+
+  <div class="card">
+    <div class="pool-total">
+      <h3 style="margin:0">愛啪啪</h3>
+      <span class="big">{{ earwax_items | length if earwax_items else 0 }} 項</span>
+    </div>
+    {% if earwax_error %}
+      <div class="empty">愛啪啪庫存讀取失敗，請重新整理</div>
+    {% elif earwax_items is none %}
+      <div class="empty">（本機測試模式不顯示）</div>
+    {% elif earwax_items %}
+      {% for r in earwax_items %}
+      <div class="row">
+        <div class="grow">
+          <div class="ttl2">{{ r.name }}</div>
+          <div class="sub">{{ '消耗品' if r.category == 'consumable' else '儀器設備' if r.category == 'equipment' else r.category }}{% if r.note %}・{{ r.note }}{% endif %}</div>
+        </div>
+        <div class="ttl2">{{ r.qty_on_hand }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">無資料</div>
+    {% endif %}
+  </div>
+  <div class="hint" style="text-align:center">愛啪啪為唯讀顯示；編輯請用電腦版庫存頁。</div>
 {% endblock %}
