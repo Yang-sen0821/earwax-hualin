@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}新增愛啪啪紀錄 — Flora Court{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px;">
+  <h2 style="margin-top:0;">新增愛啪啪銷售／使用紀錄</h2>
+  <p class="muted">扣愛啪啪庫存、全程留痕；金額不進面膜報表。純耗用（不收費）金額填 0。</p>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div style="margin-bottom:8px; color:{{ '#a33' if cat == 'error' else '#2b7a2b' }};">{{ m }}</div>{% endfor %}
+  {% endwith %}
+
+  <form method="post" style="display:flex; flex-direction:column; gap:14px;">
+    <label>品項（僅消耗品）
+      <select name="item_id" required style="width:100%; padding:8px; margin-top:4px;">
+        {% for it in items %}
+        <option value="{{ it.id }}">{{ it.name }}（現有 {{ it.qty_on_hand }}）</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>數量
+      <input type="number" name="qty" min="1" value="1" required style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <label>實收金額（元，可 0）
+      <input type="number" name="amount" min="0" step="1" value="0" required style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <label>備註
+      <input type="text" name="note" style="width:100%; padding:8px; margin-top:4px;">
+    </label>
+    <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:11px; border-radius:8px; font-size:15px; cursor:pointer;">記錄（扣庫存）</button>
+  </form>
+  <p style="margin-top:14px;"><a href="{{ url_for('earwax_sales.index') }}">← 回紀錄清單</a></p>
+</div>
+{% endblock %}

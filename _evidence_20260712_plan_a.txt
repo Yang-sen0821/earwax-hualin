@@ -1,0 +1,20 @@
+# 證據檔 2026-07-12：甲案+手機客戶建立+員工權限收緊 驗證輸出
+
+## earwax_sales_test.py（本輪實跑）
+[PASS] 1) staff 建立銷售：扣庫存+紀錄+留痕  qty=3 sale=1 audit=1
+[PASS] 2) 庫存不足擋下  qty=3
+[PASS] 3) 儀器不可售  
+[PASS] 4) 手機版建立銷售  qty=2
+[PASS] 5) staff 讀手機清單  
+[PASS] 6) 手機版建立客戶  n=1
+[PASS] 7) staff 報表全擋 403  {'/reports/': 403, '/reports/sales': 403, '/reports/finance': 403, '/reports/export.xlsx': 403, '/reports/roi': 403}
+[PASS] 8) staff 作業面正常  {'/m/orders/new': 200, '/m/inventory': 200, '/m/customers': 200, '/m/shipments': 200}
+[PASS] 9) viewer 擋愛啪啪清單與寫入  403/403
+[PASS] 10) owner 看 ROI 與愛啪啪清單  200/200
+結果：10/10 PASS
+
+## 既有回歸
+�ݨ�ݵ��G�G12/13 PASS
+  FAIL �� 8) �]�Ȥ�Q/�b�Q����
+============================================================
+結果：6/6 PASS

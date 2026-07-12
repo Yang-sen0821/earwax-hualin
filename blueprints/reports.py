@@ -401,7 +401,7 @@ def _roi_report(db):
 # 頁面：報表首頁（彙整入口 + 簡要 KPI）
 # =========================================================================
 @reports_bp.route("/")
-@login_required
+@role_required("owner", "accounting")  # 2026-07-12 收緊：金額/毛利相關，staff 不可見
 def index():
     db = get_session()
     fin = _financial_report(db)
@@ -420,7 +420,7 @@ def index():
 # 頁面：銷售報表（日 / 月 / 年）+ 排行
 # =========================================================================
 @reports_bp.route("/sales")
-@login_required
+@role_required("owner", "accounting")  # 2026-07-12 收緊：金額/毛利相關，staff 不可見
 def sales():
     db = get_session()
     granularity = request.args.get("g", "month")
@@ -452,7 +452,7 @@ def inventory():
 # 頁面：財務報表（毛利 / 淨利）
 # =========================================================================
 @reports_bp.route("/finance")
-@login_required
+@role_required("owner", "accounting")  # 2026-07-12 收緊：金額/毛利相關，staff 不可見
 def finance():
     db = get_session()
     fin = _financial_report(db)
@@ -741,7 +741,7 @@ def _sheet_sales(wb, db, Font, granularity):
 
 
 @reports_bp.route("/export.xlsx")
-@login_required
+@role_required("owner", "accounting")  # 2026-07-12 收緊：金額/毛利相關，staff 不可見
 def export_all():
     """單鍵匯出：一份 .xlsx，含訂單 / 庫存 / 庫存異動 / 銷售報表 四個工作表。"""
     db = get_session()

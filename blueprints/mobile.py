@@ -434,3 +434,95 @@ def customers():
         "mobile/customers.html", section="mobile", user=current_user(),
         customers=rows, kw=kw,
     )
+
+
+# -------------------------------------------------------------------------
+# 客戶建立（森哥 2026-07-12：手機版也要能建立客戶；規則對齊桌面 customers.new）
+# -------------------------------------------------------------------------
+@mobile_bp.route("/customers/new", methods=["GET", "POST"])
+@role_required("staff")  # 對齊桌面 WRITE_ROLES；owner 自動通過
+def customer_new():
+    if request.method == "POST":
+        db = get_session()
+        u = current_user()
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("姓名為必填")
+            return render_template("mobile/customer_new.html", section="mobile",
+                                   user=current_user(), form=request.form)
+        c = Customer(
+            name=name,
+            phone=(request.form.get("phone") or "").strip() or None,
+            email=(request.form.get("email") or "").strip() or None,
+            note=(request.form.get("note") or "").strip() or None,
+            created_by=u.id if u else None,
+            updated_by=u.id if u else None,
+        )
+        db.add(c)
+        db.commit()
+        flash(f"客戶已建立：{c.name}")
+        return redirect(url_for("mobile.customers"))
+    return render_template("mobile/customer_new.html", section="mobile",
+                           user=current_user(), form={})
+
+
+# -------------------------------------------------------------------------
+# 愛啪啪銷售/使用紀錄（甲案 2026-07-12；邏輯共用 blueprints.earwax_sales.create_sale）
+# -------------------------------------------------------------------------
+@mobile_bp.route("/earwax-sales")
+@role_required("staff", "warehouse", "accounting")
+def earwax_sales_list():
+    from blueprints.earwax_sales import _earwax_enabled
+    from db import EarwaxSale
+    if not _earwax_enabled():
+        abort(404)
+    db = get_session()
+    rows = (db.query(EarwaxSale)
+              .order_by(EarwaxSale.created_at.desc(), EarwaxSale.id.desc())
+              .limit(100).all())
+    total_amount = sum(r.amount or 0 for r in rows)
+    return render_template(
+        "mobile/earwax_sales.html", section="mobile", user=current_user(),
+        rows=rows, total_amount=total_amount,
+    )
+
+
+@mobile_bp.route("/earwax-sales/new", methods=["GET", "POST"])
+@role_required("staff", "warehouse")
+def earwax_sale_new():
+    from blueprints.earwax_sales import (
+        _earwax_enabled, _sellable_items, create_sale,
+    )
+    if not _earwax_enabled():
+        abort(404)
+    db = get_session()
+    if request.method == "POST":
+        u = current_user()
+        operator = (u.display_name or u.username) if u else "system"
+        try:
+            item_id = int(request.form["item_id"])
+            qty = int(request.form["qty"])
+            amount = float(request.form.get("amount", "0") or 0)
+        except (KeyError, ValueError):
+            flash("品項/數量/金額格式錯誤")
+            return redirect(url_for("mobile.earwax_sale_new"))
+        note = (request.form.get("note") or "").strip()
+        try:
+            ok, msg = create_sale(db, item_id, qty, amount, note,
+                                  operator, u.id if u else None)
+            if not ok:
+                db.rollback()
+                flash(f"未記錄：{msg}")
+                return redirect(url_for("mobile.earwax_sale_new"))
+            db.commit()
+        except Exception:
+            db.rollback()
+            flash("記錄失敗（資料庫錯誤），已全數回復")
+            return redirect(url_for("mobile.earwax_sale_new"))
+        flash(msg)
+        return redirect(url_for("mobile.earwax_sales_list"))
+
+    return render_template(
+        "mobile/earwax_sale_new.html", section="mobile", user=current_user(),
+        items=_sellable_items(db),
+    )

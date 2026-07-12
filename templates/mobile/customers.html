@@ -7,6 +7,9 @@
     <input type="search" name="q" value="{{ kw }}" placeholder="姓名 / 電話" autocomplete="off">
     <button class="btn btn-primary btn-line" type="submit">搜尋</button>
   </form>
+  {% if user and user.role in ('owner', 'staff') %}
+  <a href="/m/customers/new" class="btn btn-primary btn-block" style="text-decoration:none; text-align:center; display:block; margin-bottom:10px;">＋ 新增客戶</a>
+  {% endif %}
   <div class="card">
     {% if customers %}
       {% for c in customers %}

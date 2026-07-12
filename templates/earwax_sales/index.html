@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}愛啪啪銷售紀錄 — Flora Court{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin:0;">愛啪啪銷售／使用紀錄</h2>
+    <a href="{{ url_for('earwax_sales.new') }}"
+       style="text-decoration:none; background:#7a6f63; color:#fff; padding:9px 16px; border-radius:8px;">＋ 新增紀錄</a>
+  </div>
+  <p class="muted" style="margin:8px 0 16px;">獨立核算：此處金額不進面膜訂單與報表。最近 300 筆；實收合計 {{ '%.0f' | format(total_amount) }} 元。</p>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div style="margin-bottom:8px; color:{{ '#a33' if cat == 'error' else '#2b7a2b' }};">{{ m }}</div>{% endfor %}
+  {% endwith %}
+
+  {% if rows %}
+  <div style="overflow-x:auto;">
+  <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:14px;">
+    <thead>
+      <tr style="background:#faf8f5;">
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">時間</th>
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">品項</th>
+        <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">數量</th>
+        <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">實收金額</th>
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">經手人</th>
+        <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">備註</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td style="padding:8px 10px; border:1px solid #e5e0d8; white-space:nowrap;">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+        <td style="padding:8px 10px; border:1px solid #e5e0d8; font-weight:600;">{{ r.item_name }}</td>
+        <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ r.qty }}</td>
+        <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ '%.0f' | format(r.amount or 0) }}</td>
+        <td style="padding:8px 10px; border:1px solid #e5e0d8;">{{ r.operator or '' }}</td>
+        <td style="padding:8px 10px; border:1px solid #e5e0d8; color:#6b6259;">{{ r.note or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">尚無紀錄。</p>
+  {% endif %}
+</div>
+{% endblock %}

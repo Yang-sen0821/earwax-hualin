@@ -420,6 +420,28 @@ class Setting(Base):
 
 
 # =========================================================================
+# 21. earwax_sales（愛啪啪銷售/使用紀錄；甲案 2026-07-12）
+#     獨立核算：不進面膜訂單/報表。item_id 指向 earwax.consumables.id，但
+#     依 R2 不建 cross-schema FK；item_name 冗餘存檔以防品項改名。
+# =========================================================================
+class EarwaxSale(Base):
+    __tablename__ = "earwax_sales"
+    id = Column(Integer, primary_key=True)
+    item_id = Column(Integer, nullable=False)          # earwax.consumables.id（無 FK，R2）
+    item_name = Column(String(100), nullable=False)    # 冗餘品名
+    qty = Column(Integer, nullable=False)
+    amount = Column(Float, nullable=False, default=0)  # 該筆實收金額（可 0＝純使用/耗用）
+    operator = Column(String(64))
+    note = Column(Text)
+    created_by = Column(Integer, ForeignKey(_fk("users.id")))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        CheckConstraint("qty > 0", name="ck_earwax_sale_qty_pos"),
+        CheckConstraint("amount >= 0", name="ck_earwax_sale_amount_nonneg"),
+    )
+
+
+# =========================================================================
 # Engine / Session 工廠
 # =========================================================================
 from sqlalchemy import create_engine

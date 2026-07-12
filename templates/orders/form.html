@@ -3,6 +3,7 @@
 {% block content %}
 <div class="card" style="max-width:820px;">
   <h2 style="margin-top:0;">新增訂單</h2>
+  <p class="muted" style="margin-top:0;">類型：<b>面膜</b>｜<a href="{{ url_for('earwax_sales.new') }}">愛啪啪</a>（愛啪啪走獨立紀錄，不進面膜報表）</p>
   <p class="muted" style="margin-top:0;">多品項可逐列新增；任一品項庫存不足，整張訂單不會建立（同一交易，§4.2）。</p>
 
   {% with messages = get_flashed_messages() %}

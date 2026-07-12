@@ -1,0 +1,27 @@
+{% extends "mobile/_base.html" %}
+{% block title %}愛啪啪紀錄{% endblock %}
+{% block heading %}愛啪啪紀錄{% endblock %}
+{% block back %}<a href="/m" class="back">‹</a>{% endblock %}
+{% block content %}
+  <a href="/m/earwax-sales/new" class="btn btn-primary btn-block" style="text-decoration:none; text-align:center; display:block; margin-bottom:10px;">＋ 新增銷售／使用</a>
+  <div class="card">
+    <div class="pool-total">
+      <h3 style="margin:0">最近 100 筆</h3>
+      <span class="big">{{ '%.0f' | format(total_amount) }} 元</span>
+    </div>
+    {% if rows %}
+      {% for r in rows %}
+      <div class="row">
+        <div class="grow">
+          <div class="ttl2">{{ r.item_name }} × {{ r.qty }}</div>
+          <div class="sub">{{ r.created_at.strftime('%m/%d %H:%M') if r.created_at else '' }}　{{ r.operator or '' }}{% if r.note %}・{{ r.note }}{% endif %}</div>
+        </div>
+        <div class="ttl2">{{ '%.0f' | format(r.amount or 0) }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">尚無紀錄</div>
+    {% endif %}
+  </div>
+  <div class="hint" style="text-align:center">獨立核算：不進面膜訂單與報表。</div>
+{% endblock %}

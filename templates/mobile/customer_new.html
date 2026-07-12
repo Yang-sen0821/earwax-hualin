@@ -1,0 +1,20 @@
+{% extends "mobile/_base.html" %}
+{% block title %}新增客戶{% endblock %}
+{% block heading %}新增客戶{% endblock %}
+{% block back %}<a href="/m/customers" class="back">‹</a>{% endblock %}
+{% set active_tab = 'customers' %}
+{% block content %}
+  <form method="post" action="/m/customers/new">
+    <div class="card">
+      <label>姓名（必填）</label>
+      <input type="text" name="name" value="{{ form.get('name', '') }}" required autocomplete="off">
+      <label>電話</label>
+      <input type="tel" name="phone" value="{{ form.get('phone', '') }}" autocomplete="off">
+      <label>Email</label>
+      <input type="email" name="email" value="{{ form.get('email', '') }}" autocomplete="off">
+      <label>備註</label>
+      <textarea name="note">{{ form.get('note', '') }}</textarea>
+    </div>
+    <button class="btn btn-primary btn-block" type="submit">建立客戶</button>
+  </form>
+{% endblock %}

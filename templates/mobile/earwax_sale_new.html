@@ -1,0 +1,26 @@
+{% extends "mobile/_base.html" %}
+{% block title %}新增愛啪啪紀錄{% endblock %}
+{% block heading %}愛啪啪 新增紀錄{% endblock %}
+{% block back %}<a href="/m/earwax-sales" class="back">‹</a>{% endblock %}
+{% set active_tab = 'new' %}
+{% block content %}
+  <div class="hint" style="margin-bottom:8px;">類型：<a href="/m/orders/new">面膜</a>｜<b>愛啪啪</b></div>
+  <form method="post" action="/m/earwax-sales/new">
+    <div class="card">
+      <label>品項（僅消耗品）</label>
+      <select name="item_id" required>
+        {% for it in items %}
+        <option value="{{ it.id }}">{{ it.name }}（現有 {{ it.qty_on_hand }}）</option>
+        {% endfor %}
+      </select>
+      <label>數量</label>
+      <input type="number" name="qty" min="1" value="1" required>
+      <label>實收金額（純耗用填 0）</label>
+      <input type="number" name="amount" min="0" step="1" value="0" required>
+      <label>備註</label>
+      <textarea name="note"></textarea>
+    </div>
+    <button class="btn btn-primary btn-block" type="submit">記錄（扣庫存）</button>
+  </form>
+  <div class="hint" style="text-align:center">扣愛啪啪庫存並留痕；金額不進面膜報表。</div>
+{% endblock %}
