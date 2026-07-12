@@ -23,8 +23,22 @@
     <label>帳號</label>
     <input name="username" autofocus required>
     <label>密碼</label>
-    <input name="password" type="password" required>
+    <div style="position:relative;">
+      <input name="password" type="password" id="pw" required style="padding-right:44px; box-sizing:border-box;">
+      <button type="button" id="pw-toggle" aria-label="顯示密碼"
+        style="position:absolute; right:6px; top:50%; transform:translateY(-50%); width:auto; margin:0;
+               padding:4px 8px; background:transparent; border:none; color:#8a8378; font-size:16px; cursor:pointer;">👁</button>
+    </div>
     <button type="submit">登入</button>
+    <script>
+      document.getElementById('pw-toggle').addEventListener('click', function () {
+        var pw = document.getElementById('pw');
+        var show = pw.type === 'password';
+        pw.type = show ? 'text' : 'password';
+        this.textContent = show ? '🙈' : '👁';
+        this.setAttribute('aria-label', show ? '隱藏密碼' : '顯示密碼');
+      });
+    </script>
     {% with msgs = get_flashed_messages() %}
       {% if msgs %}<div class="err">{{ msgs[0] }}</div>{% endif %}
     {% endwith %}
