@@ -1,0 +1,73 @@
+# 2026-08-19 於 commit 6ae76ca 實跑三支既有測試的輸出（證明 extra_expense KeyError 為既有問題）
+# repo 內的 *_output.log 是更早期的舊檔，與現況不符，故另存本檔。
+
+===== roi_test.py =====
+FAIL 行銷成本 :: got 0.0
+Traceback (most recent call last):
+  File "E:\AI-Wiki\Projects\flora_court\roi_test.py", line 70, in <module>
+    check("建檔額外支出", abs(r["extra_expense"] - 100) < 0.01, f"got {r['extra_expense']}")
+                              ~^^^^^^^^^^^^^^^^^
+KeyError: 'extra_expense'
+(exit=0)
+
+===== payback_test.py =====
+  - B 總投入成本=630（成本不變） :: got 100.0
+  - B 回本進度%≈47.62 :: got 300.0000
+  - B 尚需回收=330 :: got 0.0
+  - B 已回本=False :: got True
+  - B 淨賺=0（未回本） :: got 200.0
+  - 頁面含收入數字 1500
+(exit=0)
+
+===== editcost_test.py =====
+    code = main()
+           ^^^^^^
+  File "E:\AI-Wiki\Projects\flora_court\editcost_test.py", line 102, in main
+    check("ROI extra_expense 含 PIF", roi_pif["extra_expense"] == 14700.0,
+                                      ~~~~~~~^^^^^^^^^^^^^^^^^
+KeyError: 'extra_expense'
+(exit=0)
+
+########################################################
+# 對照組：未改動的 4310de7（git worktree 獨立檢出）
+########################################################
+
+===== [4310de7] roi_test.py =====
+FAIL 行銷成本 :: got 0.0
+Traceback (most recent call last):
+  File "C:\Users\User\AppData\Local\Temp\fc_base_4310de7\roi_test.py", line 70, in <module>
+    check("建檔額外支出", abs(r["extra_expense"] - 100) < 0.01, f"got {r['extra_expense']}")
+                              ~^^^^^^^^^^^^^^^^^
+KeyError: 'extra_expense'
+
+===== [4310de7] payback_test.py =====
+  - B 總投入成本=630（成本不變） :: got 100.0
+  - B 回本進度%≈47.62 :: got 300.0000
+  - B 尚需回收=330 :: got 0.0
+  - B 已回本=False :: got True
+  - B 淨賺=0（未回本） :: got 200.0
+  - 頁面含收入數字 1500
+
+===== [4310de7] editcost_test.py =====
+    code = main()
+           ^^^^^^
+  File "C:\Users\User\AppData\Local\Temp\fc_base_4310de7\editcost_test.py", line 102, in main
+    check("ROI extra_expense 含 PIF", roi_pif["extra_expense"] == 14700.0,
+                                      ~~~~~~~^^^^^^^^^^^^^^^^^
+KeyError: 'extra_expense'
+
+===== [4310de7] e2e_test.py =====
+[FAIL] 8) 財務毛利/淨利公式  gross=10000.0(期望7000) net=9200.0(期望4200)
+[PASS] B) D14 歷史匯入：批次+rows落地、統計正確、未動庫存  viewer→import=403(403) acct→import=302(302) batch(imported=3,success=2,failed=1,rows=3) fail_rows=1(1) raw保留=True 庫存balances 4->4 movements 14->14 不變=True
+端到端結果：12/13 PASS
+  FAIL → 8) 財務毛利/淨利公式
+
+########################################################
+# 補齊：本次 commit（含本次改動）的 e2e 輸出，與上方 4310de7 對照組同格式
+########################################################
+
+===== [本次改動樹] e2e_test.py =====
+[FAIL] 8) 財務毛利/淨利公式  gross=10000.0(期望7000) net=9200.0(期望4200)
+[PASS] B) D14 歷史匯入：批次+rows落地、統計正確、未動庫存  viewer→import=403(403) acct→import=302(302) batch(imported=3,success=2,failed=1,rows=3) fail_rows=1(1) raw保留=True 庫存balances 4->4 movements 14->14 不變=True
+端到端結果：12/13 PASS
+  FAIL → 8) 財務毛利/淨利公式
