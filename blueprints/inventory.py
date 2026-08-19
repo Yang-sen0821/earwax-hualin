@@ -8,8 +8,9 @@
 
 權限（§六 權限矩陣）：
 - 讀：全角色（login_required）
-- 寫（補貨/拆盒/出庫）：owner / warehouse（role_required；owner 永遠通過）
-- 手動調整核可：限 owner（approve）
+- 寫（補貨/拆盒/出庫/庫存頁直改）：owner / warehouse / staff
+  （森哥 2026-08-19 授權 staff 可編輯庫存；role_required，owner 永遠通過）
+- 手動調整核可（調整單 §7.9，reason 必填）：限 owner（approve）
 
 鐵律：任何改庫存量一律呼叫 inventory_service 的契約函式；本檔禁止自寫
 inventory_balances / inventory_movements。session commit/rollback 在本層管理（同一 tx）。
@@ -51,10 +52,14 @@ OUT_TYPES = ["GIFT", "TRIAL", "PR", "KOL_SAMPLE", "STAFF_USE",
 RESTOCK_TYPES = ["PURCHASE", "RESTOCK"]
 
 
+# 庫存寫入角色（森哥 2026-08-19：員工也要能編輯庫存）。owner 由 role_required 自動通過。
+WRITE_ROLES = ("owner", "warehouse", "staff")
+
+
 def _can_write():
-    """寫權限：owner / warehouse。"""
+    """寫權限：owner / warehouse / staff。"""
     u = current_user()
-    return u is not None and u.role in ("owner", "warehouse")
+    return u is not None and u.role in WRITE_ROLES
 
 
 def _operator_name():
@@ -138,18 +143,18 @@ def _earwax_form_values():
             "unit_cost": unit_cost, "note": note}, None
 
 
-def _audit(db, action, target_id, detail_obj):
+def _audit(db, action, target_id, detail_obj, target_type="earwax.consumables"):
     u = current_user()
     db.add(AuditLog(
         actor_id=(u.id if u else None), actor_name=_operator_name(),
-        action=action, target_type="earwax.consumables",
+        action=action, target_type=target_type,
         target_id=str(target_id),
         detail=json.dumps(detail_obj, ensure_ascii=False, default=str),
     ))
 
 
 @inventory_bp.route("/earwax/<int:cid>/edit", methods=["POST"])
-@role_required("owner", "warehouse")
+@role_required(*WRITE_ROLES)
 def earwax_edit(cid):
     if not _earwax_enabled():
         abort(404)
@@ -181,7 +186,7 @@ def earwax_edit(cid):
 
 
 @inventory_bp.route("/earwax/new", methods=["POST"])
-@role_required("owner", "warehouse")
+@role_required(*WRITE_ROLES)
 def earwax_new():
     if not _earwax_enabled():
         abort(404)
@@ -206,10 +211,85 @@ def earwax_new():
 
 
 # =========================================================================
+# 庫存頁直接編輯（森哥 2026-08-19 乙案）
+#   一個商品一顆「儲存」：品名 + 三池 × 5 分類的數量，改哪格記哪格。
+#   不必人工填 reason，系統自動留痕（數量走 inv.quick_adjust → ADJUSTMENT
+#   movement 含 qty_before/after；品名走 audit_logs）。
+#   全欄位先驗證再套用，任何一格失敗整筆 rollback（R1：同生同滅）。
+# =========================================================================
+@inventory_bp.route("/quick-edit/<int:pid>", methods=["POST"])
+@role_required(*WRITE_ROLES)
+def quick_edit(pid):
+    db = get_session()
+    product = db.query(Product).filter_by(id=pid).first()
+    if product is None:
+        flash("找不到該商品", "error")
+        return redirect(url_for("inventory.index"))
+
+    # ---- 先全欄位驗證（不動資料）----
+    new_name = request.form.get("name", "").strip()
+    if not new_name:
+        flash("品名不可空白，未儲存", "error")
+        return redirect(url_for("inventory.index"))
+
+    targets = {}
+    for pool in INVENTORY_POOLS:
+        for cat in STOCK_CATEGORIES:
+            raw = request.form.get(f"qty_{pool}_{cat}", "").strip()
+            if raw == "":
+                continue
+            try:
+                val = int(raw)
+            except ValueError:
+                flash(f"{POOL_LABELS.get(pool, pool)}／{CAT_LABELS.get(cat, cat)} 數量格式錯誤，未儲存", "error")
+                return redirect(url_for("inventory.index"))
+            if val < 0:
+                flash(f"{POOL_LABELS.get(pool, pool)}／{CAT_LABELS.get(cat, cat)} 數量不可為負，未儲存", "error")
+                return redirect(url_for("inventory.index"))
+            targets[(pool, cat)] = val
+
+    # ---- 套用（同一 tx）----
+    actor = current_user()
+    changed = []
+    try:
+        if new_name != product.name:
+            before_name = product.name
+            product.name = new_name
+            _audit(db, "product_name_edit", product.id,
+                   {"before": {"name": before_name}, "after": {"name": new_name}},
+                   target_type="products")
+            changed.append(f"品名 {before_name} → {new_name}")
+
+        for (pool, cat), val in targets.items():
+            res = inv.quick_adjust(
+                db, product.id, pool, cat, val,
+                _operator_name(), actor_id=(actor.id if actor else None),
+            )
+            if not res.ok:
+                db.rollback()
+                flash(f"{POOL_LABELS.get(pool, pool)}／{CAT_LABELS.get(cat, cat)} 更新失敗：{res.error}（整筆未儲存）", "error")
+                return redirect(url_for("inventory.index"))
+            if res.movement_ids:
+                changed.append(f"{POOL_LABELS.get(pool, pool)}／{CAT_LABELS.get(cat, cat)} "
+                               f"{res.qty_before} → {res.qty_after}")
+        db.commit()
+    except Exception:
+        db.rollback()
+        flash("儲存失敗（資料庫錯誤），整筆未儲存", "error")
+        return redirect(url_for("inventory.index"))
+
+    if changed:
+        flash(f"「{new_name}」已更新：" + "；".join(changed), "ok")
+    else:
+        flash(f"「{new_name}」沒有任何變更", "ok")
+    return redirect(url_for("inventory.index"))
+
+
+# =========================================================================
 # 補貨入庫（D8 入庫 2 類）
 # =========================================================================
 @inventory_bp.route("/restock", methods=["GET", "POST"])
-@role_required("owner", "warehouse")
+@role_required(*WRITE_ROLES)
 def restock():
     db = get_session()
     products = db.query(Product).order_by(Product.id).all()
@@ -246,7 +326,7 @@ def restock():
 # 通用出庫（D8 業務出庫 9 類，扣 normal 以外或贈品/試用等）
 # =========================================================================
 @inventory_bp.route("/deduct", methods=["GET", "POST"])
-@role_required("owner", "warehouse")
+@role_required(*WRITE_ROLES)
 def deduct():
     db = get_session()
     products = db.query(Product).order_by(Product.id).all()
@@ -288,7 +368,7 @@ def deduct():
 # 拆盒調撥（D7）：1 盒 → 5 片，2 筆 movement 同 group_id
 # =========================================================================
 @inventory_bp.route("/split", methods=["GET", "POST"])
-@role_required("owner", "warehouse")
+@role_required(*WRITE_ROLES)
 def split():
     db = get_session()
     # 只有面膜類（非包材）可拆盒

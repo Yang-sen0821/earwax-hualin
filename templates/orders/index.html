@@ -4,8 +4,10 @@
 <div class="card">
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <h2 style="margin:0;flex:1;">訂單管理</h2>
+    {% if session.get('role') in ('owner', 'accounting') %}
     <a href="{{ url_for('orders.import_page') }}"
        style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">歷史匯入</a>
+    {% endif %}
     <a href="{{ url_for('orders.new') }}"
        style="background:var(--fc);color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;">+ 新增訂單</a>
   </div>

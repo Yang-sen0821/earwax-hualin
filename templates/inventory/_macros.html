@@ -16,18 +16,22 @@
   {% endwith %}
 {% endmacro %}
 
+{# 分頁列按角色顯示（森哥 2026-08-19）：以前不分角色全列出，員工點到沒權限的會噴錯誤頁。
+   第 4 欄 = 可見角色；'*' 全部可見。角色集合須與 blueprints/inventory.py 的
+   WRITE_ROLES 及各路由 @role_required 一致。 #}
 {% macro subnav(active) %}
+  {% set role = session.get('role') %}
   <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px;">
     {% set links = [
-      ('index','總覽','inventory.index'),
-      ('restock','補貨入庫','inventory.restock'),
-      ('deduct','通用出庫','inventory.deduct'),
-      ('split','拆盒調撥','inventory.split'),
-      ('adjust','盤點調整','inventory.adjust'),
-      ('movements','異動紀錄','inventory.movements'),
-      ('alerts','低水位警示','inventory.alerts')
+      ('index','總覽','inventory.index', '*'),
+      ('restock','補貨入庫','inventory.restock', ['owner','warehouse','staff']),
+      ('deduct','通用出庫','inventory.deduct', ['owner','warehouse','staff']),
+      ('split','拆盒調撥','inventory.split', ['owner','warehouse','staff']),
+      ('adjust','盤點調整','inventory.adjust', ['owner']),
+      ('movements','異動紀錄','inventory.movements', '*'),
+      ('alerts','低水位警示','inventory.alerts', '*')
     ] %}
-    {% for key, label, endpoint in links %}
+    {% for key, label, endpoint, allow in links if allow == '*' or role in allow %}
       <a href="{{ url_for(endpoint) }}"
          style="text-decoration:none; padding:7px 12px; border-radius:8px; font-size:14px;
          {% if active == key %}background:#7a6f63; color:#fff;{% else %}background:#fff; color:#2b2b2b; border:1px solid #e5e0d8;{% endif %}">

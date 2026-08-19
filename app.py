@@ -3,7 +3,7 @@
 註冊 auth + 6 個業務 blueprint；加 /health。
 R2/D1：ENABLE_EARWAX_ENTRY=false ⇒ 不 register 任何 earwax blueprint（本 app 完全不 import earwax）。
 """
-from flask import Flask, jsonify, g
+from flask import Flask, jsonify, g, render_template
 
 from config import Config
 from auth import auth_bp
@@ -52,6 +52,20 @@ def create_app():
             "db": "sqlite" if Config.is_sqlite() else "postgres",
             "earwax_entry": Config.ENABLE_EARWAX_ENTRY,
         })
+
+    # ---- 中文錯誤頁（森哥 2026-08-19：員工撞到權限時看到英文 Forbidden 白頁，像網站壞掉）----
+    #      手機/桌面共用 base.html；403 一律導向中文說明頁，不洩漏內部訊息。
+    @app.errorhandler(403)
+    def forbidden(e):
+        return render_template("errors/403.html", section=""), 403
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template("errors/404.html", section=""), 404
+
+    @app.errorhandler(500)
+    def server_error(e):
+        return render_template("errors/500.html", section=""), 500
 
     # ---- session 清理 ----
     @app.teardown_appcontext

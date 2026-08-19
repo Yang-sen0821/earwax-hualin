@@ -8,13 +8,19 @@
   <form method="post" action="/m/orders/new">
     <div class="card">
       <h3>收件資訊</h3>
+      {# 客戶欄：打字過濾（森哥 2026-08-19），與桌面同行為。原為純下拉。 #}
       <label>客戶（選填）</label>
-      <select name="customer_id">
-        <option value="">— 不綁定客戶 —</option>
-        {% for c in customers %}
-        <option value="{{ c.id }}">{{ c.name }}{% if c.phone %}（{{ c.phone }}）{% endif %}</option>
-        {% endfor %}
-      </select>
+      <div style="position:relative;">
+        <input type="text" id="cust-input" autocomplete="off"
+               placeholder="打字搜尋姓名或電話；留空＝不綁定">
+        <input type="hidden" name="customer_id" id="cust-id">
+        <input type="hidden" name="new_customer_name" id="cust-new">
+        <div id="cust-list"
+             style="display:none;position:absolute;z-index:30;left:0;right:0;background:#fff;
+                    border:1px solid #e5e0d8;border-radius:8px;margin-top:2px;max-height:220px;
+                    overflow-y:auto;box-shadow:0 6px 18px rgba(0,0,0,.12);"></div>
+      </div>
+      <div id="cust-state" style="font-size:12px;margin:2px 0 6px;color:#6b6259;"></div>
       <label>收件人</label>
       <input type="text" name="recipient_name" autocomplete="off">
       <label>電話</label>
@@ -74,5 +80,69 @@
       var t=document.getElementById('line-tpl');
       document.getElementById('lines').appendChild(t.content.cloneNode(true));
     }
+  </script>
+
+  <script type="application/json" id="cust-data">[{% for c in customers %}{"id": {{ c.id }}, "name": {{ c.name|tojson }}, "phone": {{ (c.phone or '')|tojson }}}{{ "," if not loop.last }}{% endfor %}]</script>
+  <script>
+  (function () {
+    var DATA = JSON.parse(document.getElementById('cust-data').textContent || '[]');
+    var input = document.getElementById('cust-input');
+    var hidId = document.getElementById('cust-id');
+    var hidNew = document.getElementById('cust-new');
+    var list = document.getElementById('cust-list');
+    var state = document.getElementById('cust-state');
+    if (!input) { return; }
+
+    function label(c) { return c.phone ? c.name + '（' + c.phone + '）' : c.name; }
+
+    function showState() {
+      if (hidId.value) { state.textContent = '已選客戶：' + input.value; state.style.color = '#256b2e'; }
+      else if (hidNew.value) { state.textContent = '送出後會新增客戶「' + hidNew.value + '」'; state.style.color = '#8a6d00'; }
+      else if (input.value.trim()) { state.textContent = '尚未選定客戶；挑一位或選「新增為新客戶」'; state.style.color = '#a33'; }
+      else { state.textContent = ''; }
+    }
+
+    function row(text, fn, accent) {
+      var d = document.createElement('div');
+      d.textContent = text;
+      d.style.cssText = 'padding:10px;cursor:pointer;font-size:15px;' + (accent ? 'color:#8a6d00;font-weight:600;' : '');
+      d.onmousedown = function (e) { e.preventDefault(); fn(); };
+      d.ontouchstart = function (e) { e.preventDefault(); fn(); };
+      list.appendChild(d);
+    }
+
+    function render() {
+      var q = input.value.trim();
+      list.innerHTML = '';
+      if (!q) { hidId.value = ''; hidNew.value = ''; list.style.display = 'none'; showState(); return; }
+      var ql = q.toLowerCase();
+      var hits = DATA.filter(function (c) {
+        return c.name.toLowerCase().indexOf(ql) >= 0 || (c.phone || '').indexOf(q) >= 0;
+      }).slice(0, 20);
+      hits.forEach(function (c) {
+        row(label(c), function () {
+          hidId.value = c.id; hidNew.value = ''; input.value = label(c);
+          list.style.display = 'none'; showState();
+        }, false);
+      });
+      var exact = DATA.some(function (c) { return c.name === q; });
+      if (!exact) {
+        row((hits.length ? '找不到你要的？' : '找不到「' + q + '」') + '　＋ 新增為新客戶「' + q + '」', function () {
+          hidId.value = ''; hidNew.value = q; input.value = q;
+          list.style.display = 'none'; showState();
+        }, true);
+      }
+      var sel = DATA.filter(function (c) { return label(c) === input.value; });
+      if (sel.length) { hidId.value = sel[0].id; hidNew.value = ''; }
+      else if (hidNew.value !== q) { hidId.value = ''; }
+      list.style.display = 'block';
+      showState();
+    }
+
+    input.addEventListener('input', render);
+    input.addEventListener('focus', function () { if (input.value.trim()) { render(); } });
+    document.addEventListener('click', function (e) { if (e.target !== input) { list.style.display = 'none'; } });
+    showState();
+  })();
   </script>
 {% endblock %}

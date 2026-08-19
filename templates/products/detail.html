@@ -8,10 +8,12 @@
   <h1>{{ product.name }}</h1>
   <div>
     <a class="btn" href="{{ url_for('products.index') }}">← 回列表</a>
+    {% if session.get('role') == 'owner' %}
     <a class="btn" href="{{ url_for('products.edit', pid=product.id) }}">編輯</a>
     <form class="inline" method="post" action="{{ url_for('products.toggle_active', pid=product.id) }}">
       <button type="submit" class="btn">{{ '下架' if product.active else '上架' }}</button>
     </form>
+    {% endif %}
   </div>
 </div>
 

@@ -15,13 +15,21 @@
   <form method="post" action="{{ url_for('orders.new') }}">
     <h3>收件資訊</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <label>客戶（選填）
-        <select name="customer_id" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
-          <option value="">— 不綁定客戶 —</option>
-          {% for c in customers %}
-          <option value="{{ c.id }}" {{ 'selected' if form.get('customer_id')==(c.id|string) }}>{{ c.name }}{% if c.phone %}（{{ c.phone }}）{% endif %}</option>
-          {% endfor %}
-        </select>
+      {# 客戶欄：打字過濾（森哥 2026-08-19）。原本是純下拉，客戶一多就找不到人。
+         打的名字不在名單時，可當場勾選「新增為新客戶」，不必先跳到客戶頁建檔。 #}
+      <label style="position:relative;">客戶（選填）
+        <input type="text" id="cust-input" autocomplete="off"
+               placeholder="打字搜尋姓名或電話；留空＝不綁定客戶"
+               value="{{ form.get('customer_display', '') }}"
+               style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
+        <input type="hidden" name="customer_id" id="cust-id" value="{{ form.get('customer_id', '') }}">
+        <input type="hidden" name="new_customer_name" id="cust-new" value="{{ form.get('new_customer_name', '') }}">
+        <input type="hidden" name="customer_display" id="cust-display" value="{{ form.get('customer_display', '') }}">
+        <div id="cust-list"
+             style="display:none;position:absolute;z-index:30;left:0;right:0;background:#fff;
+                    border:1px solid var(--line);border-radius:8px;margin-top:2px;max-height:230px;
+                    overflow-y:auto;box-shadow:0 6px 18px rgba(0,0,0,.08);"></div>
+        <div id="cust-state" style="font-size:12px;margin-top:4px;color:#6b6259;"></div>
       </label>
       <label>收件人姓名
         <input name="recipient_name" value="{{ form.get('recipient_name','') }}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
@@ -86,4 +94,102 @@
   }
   addRow();
 </script>
+
+<script type="application/json" id="cust-data">[{% for c in customers %}{"id": {{ c.id }}, "name": {{ c.name|tojson }}, "phone": {{ (c.phone or '')|tojson }}}{{ "," if not loop.last }}{% endfor %}]</script>
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('cust-data').textContent || '[]');
+  var input = document.getElementById('cust-input');
+  var hidId = document.getElementById('cust-id');
+  var hidNew = document.getElementById('cust-new');
+  var hidDisp = document.getElementById('cust-display');
+  var list = document.getElementById('cust-list');
+  var state = document.getElementById('cust-state');
+  if (!input) { return; }
+
+  function label(c) { return c.phone ? c.name + '（' + c.phone + '）' : c.name; }
+
+  function showState() {
+    if (hidId.value) {
+      state.textContent = '已選客戶：' + input.value;
+      state.style.color = '#256b2e';
+    } else if (hidNew.value) {
+      state.textContent = '送出後會新增客戶「' + hidNew.value + '」';
+      state.style.color = '#8a6d00';
+    } else if (input.value.trim()) {
+      state.textContent = '尚未選定客戶；可從清單挑一位，或選「新增為新客戶」';
+      state.style.color = '#a33';
+    } else {
+      state.textContent = '';
+    }
+  }
+
+  function pick(c) {
+    hidId.value = c.id;
+    hidNew.value = '';
+    input.value = label(c);
+    hidDisp.value = input.value;
+    list.style.display = 'none';
+    showState();
+  }
+
+  function pickNew(name) {
+    hidId.value = '';
+    hidNew.value = name;
+    input.value = name;
+    hidDisp.value = name;
+    list.style.display = 'none';
+    showState();
+  }
+
+  function row(text, onclick, accent) {
+    var d = document.createElement('div');
+    d.textContent = text;
+    d.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:14px;' +
+                      (accent ? 'color:#8a6d00;font-weight:600;' : '');
+    d.onmouseover = function () { d.style.background = '#faf8f5'; };
+    d.onmouseout = function () { d.style.background = '#fff'; };
+    d.onmousedown = function (e) { e.preventDefault(); onclick(); };
+    list.appendChild(d);
+  }
+
+  function render() {
+    var q = input.value.trim();
+    hidDisp.value = input.value;
+    list.innerHTML = '';
+    if (!q) {
+      hidId.value = ''; hidNew.value = '';
+      list.style.display = 'none';
+      showState();
+      return;
+    }
+    var ql = q.toLowerCase();
+    var hits = DATA.filter(function (c) {
+      return c.name.toLowerCase().indexOf(ql) >= 0 || (c.phone || '').indexOf(q) >= 0;
+    }).slice(0, 20);
+    hits.forEach(function (c) { row(label(c), function () { pick(c); }, false); });
+    var exact = DATA.some(function (c) { return c.name === q; });
+    if (!exact) {
+      row((hits.length ? '找不到你要的？' : '找不到「' + q + '」') + '　＋ 新增為新客戶「' + q + '」',
+          function () { pickNew(q); }, true);
+    }
+    // 輸入變動就先清掉舊選擇，避免改了字卻沿用上一位客戶
+    if (!(hidNew.value && hidNew.value === q)) {
+      var sel = DATA.filter(function (c) { return label(c) === input.value; });
+      hidId.value = sel.length ? sel[0].id : '';
+      if (hidId.value) { hidNew.value = ''; }
+    }
+    list.style.display = 'block';
+    showState();
+  }
+
+  input.addEventListener('input', render);
+  input.addEventListener('focus', function () { if (input.value.trim()) { render(); } });
+  document.addEventListener('click', function (e) {
+    if (e.target !== input) { list.style.display = 'none'; }
+  });
+  showState();
+})();
+</script>
+
 {% endblock %}

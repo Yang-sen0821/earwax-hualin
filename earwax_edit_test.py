@@ -85,13 +85,24 @@ c.post("/inventory/earwax/1/edit", data={"name": "  ", "category": "consumable",
 row = s.execute(text("SELECT name, qty_on_hand FROM test_earwax_consumables WHERE id=1")).first()
 check("5) 負數量/空品名被擋、原值不動", row[0] == "銀安瓶" and row[1] == 5, f"row={tuple(row)}")
 
-# 6) 權限：staff（非 owner/warehouse）→ 403
+# 6) 權限（森哥 2026-08-19 授權：staff 也可編輯庫存，故此案由「被擋」改為「可寫」）
 c.get("/logout", follow_redirects=True)
 c.post("/login", data={"username": "staff", "password": "staff123"})
+r = c.post("/inventory/earwax/1/edit", data={"name": "銀安瓶", "category": "consumable",
+                                              "qty_on_hand": "9", "unit_cost": "0", "note": ""})
+s.expire_all()
+row = s.execute(text("SELECT name, qty_on_hand FROM test_earwax_consumables WHERE id=1")).first()
+check("6) staff 可編輯愛啪啪品項（2026-08-19 放寬）", r.status_code in (200, 302) and row[1] == 9,
+      f"status={r.status_code} row={tuple(row)}")
+
+# 6b) 權限下界：viewer 仍被擋（403）且值不動
+c.get("/logout", follow_redirects=True)
+c.post("/login", data={"username": "viewer", "password": "viewer123"})
 r = c.post("/inventory/earwax/1/edit", data={"name": "駭", "category": "consumable",
                                               "qty_on_hand": "99", "unit_cost": "0", "note": ""})
+s.expire_all()
 row = s.execute(text("SELECT name, qty_on_hand FROM test_earwax_consumables WHERE id=1")).first()
-check("6) staff 編輯被擋(403)且值不動", r.status_code == 403 and row[0] == "銀安瓶" and row[1] == 5,
+check("6b) viewer 編輯被擋(403)且值不動", r.status_code == 403 and row[0] == "銀安瓶" and row[1] == 9,
       f"status={r.status_code} row={tuple(row)}")
 
 print("=" * 50)

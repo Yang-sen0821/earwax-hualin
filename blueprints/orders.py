@@ -129,6 +129,15 @@ def _create_order(db):
 
     # ---- 1. 解析表單 ----
     customer_id = _to_int(request.form.get("customer_id"))
+    # 建單當場新增客戶（森哥 2026-08-19）：客戶欄可打字過濾，打的名字不在名單時
+    # 前端把它放進 new_customer_name。此處在「同一張訂單的 transaction」內建客戶，
+    # 訂單若整張 rollback，客戶也不會留下半筆。已選既有客戶時以 customer_id 為準。
+    new_customer_name = (request.form.get("new_customer_name") or "").strip()
+    if customer_id:
+        new_customer_name = ""
+    if len(new_customer_name) > 64:
+        flash("新客戶姓名過長（上限 64 字），訂單未建立")
+        return _redraw_form(db)
     recipient_name = (request.form.get("recipient_name") or "").strip()
     recipient_phone = (request.form.get("recipient_phone") or "").strip()
     shipping_address = (request.form.get("shipping_address") or "").strip()
@@ -170,6 +179,23 @@ def _create_order(db):
         total_amount = 0
 
     # ---- 2. 整張原子 transaction（§4.2）----
+    created_customer = None
+    if new_customer_name:
+        existing = (db.query(Customer)
+                      .filter(Customer.name == new_customer_name).first())
+        if existing is not None:
+            customer_id = existing.id      # 同名已存在就沿用，不重複建一筆
+        else:
+            cust = Customer(
+                name=new_customer_name,
+                phone=recipient_phone or None,
+                created_by=_uid(), updated_by=_uid(),
+            )
+            db.add(cust)
+            db.flush()
+            customer_id = cust.id
+            created_customer = new_customer_name
+
     order_no = _gen_order_no(db)
     order = Order(
         order_no=order_no,
@@ -224,7 +250,10 @@ def _create_order(db):
         flash(f"建立訂單失敗，已全數回復：{exc}")
         return _redraw_form(db)
 
-    flash(f"訂單 {order_no} 已建立，庫存已扣減")
+    if created_customer:
+        flash(f"訂單 {order_no} 已建立，庫存已扣減；同時新增客戶「{created_customer}」")
+    else:
+        flash(f"訂單 {order_no} 已建立，庫存已扣減")
     return redirect(url_for("orders.detail", order_id=order.id))
 
 

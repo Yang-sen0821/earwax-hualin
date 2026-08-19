@@ -560,6 +560,55 @@ def adjust_inventory(session, product_id, inventory_pool, stock_category,
                   movement_ids=[mv_id])
 
 
+def quick_adjust(session, product_id, inventory_pool, stock_category,
+                 target_qty, operator, actor_id, note=""):
+    """庫存頁「直接改數字」路徑（森哥 2026-08-19 乙案）。
+
+    與 adjust_inventory（§7.9 調整單）的差別，兩者不可混用：
+    - adjust_inventory：owner 核可、reason 人工必填、ref_type='adjustment'。
+    - quick_adjust：具庫存寫入權者當場直改、不必填 reason，系統自動留痕，
+      ref_type='quick_edit'、reason 固定為「庫存頁直接修改」、ref_id/created_by = 操作者。
+
+    仍守 R1：唯一經 _apply_delta，同 tx 寫 inventory_movements（含 qty_before/after）。
+    delta=0 不留痕。
+    """
+    if inventory_pool not in INVENTORY_POOLS:
+        return Result(ok=False, error=f"非法 inventory_pool: {inventory_pool}")
+    if stock_category not in STOCK_CATEGORIES:
+        return Result(ok=False, error=f"非法 stock_category: {stock_category}")
+    if target_qty is None or target_qty < 0:
+        return Result(ok=False, error="數量必須 >= 0")
+    if not operator:
+        return Result(ok=False, error="operator 不可空")
+    if actor_id is None:
+        return Result(ok=False, error="actor_id 必填（留痕需記操作者）")
+
+    bal = _get_balance(session, product_id, inventory_pool, stock_category)
+    current = bal.qty if bal else 0
+    delta = target_qty - current
+    if delta == 0:
+        return Result(ok=True, qty_before=current, qty_after=current,
+                      remaining=current, movement_ids=[])
+
+    try:
+        qb, qa, mv_id = _apply_delta(
+            session, product_id, inventory_pool, stock_category, delta,
+            movement_type="ADJUSTMENT", operator=operator,
+            stock_category_from=(stock_category if delta < 0 else None),
+            stock_category_to=(stock_category if delta > 0 else None),
+            ref_type="quick_edit", ref_id=str(actor_id),
+            reason="庫存頁直接修改",
+            note=(note + f"（操作者 user_id={actor_id}）").strip(),
+            created_by=actor_id,
+            allow_create_on_increase=True,
+        )
+    except InventoryError as e:
+        return Result(ok=False, error=str(e))
+
+    return Result(ok=True, qty_before=qb, qty_after=qa, remaining=qa,
+                  movement_ids=[mv_id])
+
+
 # 別名：接案任務以 manual_adjust 稱呼，地基契約簽章為 adjust_inventory，兩者同一實作
 manual_adjust = adjust_inventory
 

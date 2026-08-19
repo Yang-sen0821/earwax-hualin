@@ -195,6 +195,14 @@ def order_new():
         note = (request.form.get("note") or "").strip()
         customer_id_raw = (request.form.get("customer_id") or "").strip()
         customer_id = int(customer_id_raw) if customer_id_raw.isdigit() else None
+        # 建單當場新增客戶（森哥 2026-08-19）：與桌面同規則，客戶在同一 tx 內建立，
+        # 訂單整張 rollback 時客戶也不留下。已選既有客戶時以 customer_id 為準。
+        new_customer_name = (request.form.get("new_customer_name") or "").strip()
+        if customer_id:
+            new_customer_name = ""
+        if len(new_customer_name) > 64:
+            flash("新客戶姓名過長（上限 64 字），訂單未建立")
+            return _render_order_new(db)
 
         # 解析多品項：product_id[]、combo_code[]（單位 LOOSE/BOX）、qty[]、amount[]（實收金額）
         product_ids = request.form.getlist("product_id")
@@ -222,7 +230,25 @@ def order_new():
             return _render_order_new(db)
 
         # ---- §4.2：建單 + 建明細 + 逐項扣庫存，全在同一 transaction ----
+        created_customer = None
         try:
+            if new_customer_name:
+                existing = (db.query(Customer)
+                              .filter(Customer.name == new_customer_name).first())
+                if existing is not None:
+                    customer_id = existing.id
+                else:
+                    cust = Customer(
+                        name=new_customer_name,
+                        phone=recipient_phone or None,
+                        created_by=u.id if u else None,
+                        updated_by=u.id if u else None,
+                    )
+                    db.add(cust)
+                    db.flush()
+                    customer_id = cust.id
+                    created_customer = new_customer_name
+
             order = Order(
                 order_no=_gen_order_no(db),
                 customer_id=customer_id,
@@ -269,7 +295,10 @@ def order_new():
 
             order.total_amount = total
             db.commit()
-            flash(f"訂單已建立：{order.order_no}")
+            if created_customer:
+                flash(f"訂單已建立：{order.order_no}；同時新增客戶「{created_customer}」")
+            else:
+                flash(f"訂單已建立：{order.order_no}")
             return redirect(url_for("mobile.order_detail", order_id=order.id))
 
         except Exception as e:  # noqa: BLE001 — 任何錯誤整張 rollback（§4.2 / R1）
@@ -281,7 +310,7 @@ def order_new():
 
 
 def _render_order_new(db):
-    customers = db.query(Customer).order_by(Customer.name).limit(200).all()
+    customers = db.query(Customer).order_by(Customer.name).all()
     # 可下單品項：非包材、上架
     products = (
         db.query(Product)

@@ -12,15 +12,19 @@
   <h2 style="margin:14px 0 6px; font-size:19px;">面膜（Flora Court）</h2>
   <p class="muted">三池（盒裝 / 裸片 / 紙袋）× 5 分類（正常 / 預留 / 公關品 / 試用品 / 損耗報廢）。
      預留為物理分列，一般銷售取不到。
-     {% if is_owner %}點表格數字可開「調整單」改數量（留痕）；「編輯品名」可改商品名稱。{% endif %}</p>
+     {% if can_write %}品名與各格數量可直接修改，改完按該商品下方的「儲存」；每次修改系統都會自動留存紀錄。{% endif %}</p>
 
   {% for p in products %}
     <div style="margin-bottom:28px;">
-      <h3 style="margin:0 0 8px;">{{ p.name }}
-        <span class="muted" style="font-size:13px; font-weight:400;">（{{ p.sku }}{% if p.is_packaging %}・包材{% endif %}）</span>
-        {% if is_owner %}
-          <a href="{{ url_for('products.edit', pid=p.id) }}" style="font-size:12px; font-weight:400; margin-left:6px;">編輯品名</a>
+      {% if can_write %}<form method="post" action="{{ url_for('inventory.quick_edit', pid=p.id) }}">{% endif %}
+      <h3 style="margin:0 0 8px;">
+        {% if can_write %}
+          <input type="text" name="name" value="{{ p.name }}" required
+                 style="font-size:17px; font-weight:600; padding:6px 8px; border:1px solid #e5e0d8; border-radius:6px; min-width:200px;">
+        {% else %}
+          {{ p.name }}
         {% endif %}
+        <span class="muted" style="font-size:13px; font-weight:400;">（{{ p.sku }}{% if p.is_packaging %}・包材{% endif %}）</span>
       </h3>
       <div style="overflow-x:auto;">
       <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:14px;">
@@ -47,11 +51,10 @@
               <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;
                 {% if c == 'reserved' %}background:#f6f2ff;{% endif %}
                 {% if v is none %}color:#bbb;{% endif %}">
-                {% if is_owner %}
-                  <a href="{{ url_for('inventory.adjust', product_id=p.id, pool=pool, category=c) }}"
-                     title="點擊調整此格數量（走調整單留痕）" style="text-decoration:underline dotted; color:inherit;">
-                    {{ v if v is not none else '—' }}
-                  </a>
+                {% if can_write %}
+                  <input type="number" name="qty_{{ pool }}_{{ c }}" value="{{ v if v is not none else 0 }}"
+                         min="0" step="1"
+                         style="width:78px; padding:6px; text-align:right; border:1px solid #e5e0d8; border-radius:6px;">
                 {% else %}
                   {{ v if v is not none else '—' }}
                 {% endif %}
@@ -62,6 +65,13 @@
         </tbody>
       </table>
       </div>
+      {% if can_write %}
+        <div style="margin-top:8px;">
+          <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:8px 18px; border-radius:8px; cursor:pointer;">儲存</button>
+          <span class="muted" style="font-size:12px; margin-left:8px;">此商品的品名與數量一起存</span>
+        </div>
+      </form>
+      {% endif %}
     </div>
   {% else %}
     <p class="muted">尚無商品。</p>
@@ -79,7 +89,7 @@
   {% if can_write %}
     <p class="muted">各欄位可直接修改後按「儲存」；最下方可新增品項。每次修改都會留存紀錄。</p>
   {% else %}
-    <p class="muted">唯讀顯示；編輯需 owner／倉管權限。</p>
+    <p class="muted">唯讀顯示；編輯需 owner／倉管／員工權限。</p>
   {% endif %}
   {% if earwax_error %}
     <p style="color:#a33;">愛啪啪庫存讀取失敗，請重新整理；持續失敗請通知管理員。</p>
