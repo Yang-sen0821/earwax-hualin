@@ -2,13 +2,13 @@
 
 本檔只讀資料、做聚合與匯出，不變動任何庫存量（不碰 inventory_balances / inventory_movements 寫入）。
 - D10 報表：銷售日/月/年報、商品銷售排行（依 order_items.combo_code 聚合）、庫存報表（目前/預留/已售/公關品）。
-- D11 匯出 Excel：訂單 / 庫存 / 庫存異動 / 銷售報表 四類（openpyxl）。
+- D11 匯出 Excel：訂單 / 庫存 / 庫存異動 / 銷售報表 / 客戶排行（CR-3）五類（openpyxl）。
 - D12/D13 財務：毛利 = 銷售金額 − 商品成本；淨利 = 毛利 − 包材 − 行銷 − 其他支出。
   來源：financial_entries（sale / product_cost / packaging / marketing 等分錄）+ extra_expenses（其他支出）。
 
 權限（§六）：reports / finance 讀取 → 全角色可讀（viewer 以上）；故僅 @login_required。
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 from decimal import Decimal
 
@@ -16,7 +16,7 @@ from flask import (
     Blueprint, render_template, request, send_file,
     redirect, url_for, flash, abort,
 )
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from auth import login_required, role_required, current_user
 from db import (
@@ -139,6 +139,60 @@ def _sales_ranking(db):
         })
     result.sort(key=lambda r: r["total_qty"], reverse=True)
     return result
+
+
+# =========================================================================
+# 共用：客戶銷售排行（CR-3，依 orders.customer_id 聚合）
+# =========================================================================
+UNBOUND_CUSTOMER_LABEL = "未綁定客戶"
+
+
+def _customer_ranking(db, date_from=None, date_to=None):
+    """依客戶聚合訂單（口徑與 customers.customer_summary 一致）：
+      訂單數     = 非作廢單數（含已退款單）
+      累計金額   = 非作廢 且 payment_status != refunded 的 total_amount 合計（不含運費）
+      最近購買   = 最近一筆非作廢單 created_at
+    date_from / date_to（datetime，皆含當日）依 created_at 篩選；None = 不限。
+    回傳 list[dict(customer_id, name, phone, order_count, total_amount, last_order_at)]，
+    金額 desc、次鍵訂單數 desc；customer_id IS NULL 的單另計一列「未綁定客戶」固定排最後。
+    """
+    amount_expr = case(
+        (Order.payment_status != "refunded", Order.total_amount), else_=0
+    )
+    q = active_orders(
+        db.query(
+            Order.customer_id,
+            func.count(Order.id),
+            func.coalesce(func.sum(amount_expr), 0),
+            func.max(Order.created_at),
+        )
+    )
+    if date_from is not None:
+        q = q.filter(Order.created_at >= date_from)
+    if date_to is not None:
+        # 含 date_to 當日：< 次日 00:00
+        q = q.filter(Order.created_at < (date_to.replace(hour=0, minute=0, second=0, microsecond=0)
+                                         + timedelta(days=1)))
+    rows = q.group_by(Order.customer_id).all()
+    cust = {c.id: c for c in db.query(Customer).all()}
+    ranked, unbound = [], None
+    for cid, cnt, amt, last in rows:
+        row = {
+            "customer_id": cid,
+            "name": cust[cid].name if cid in cust else (UNBOUND_CUSTOMER_LABEL if cid is None else f"#{cid}"),
+            "phone": (cust[cid].phone or "") if cid in cust else "",
+            "order_count": int(cnt or 0),
+            "total_amount": _to_float(amt),
+            "last_order_at": last,
+        }
+        if cid is None:
+            unbound = row
+        else:
+            ranked.append(row)
+    ranked.sort(key=lambda r: (-r["total_amount"], -r["order_count"]))
+    if unbound:
+        ranked.append(unbound)
+    return ranked
 
 
 # =========================================================================
@@ -444,6 +498,34 @@ def sales():
     return render_template("reports/sales.html", section="reports",
                            granularity=granularity, periods=periods,
                            ranking=ranking, totals=totals)
+
+
+# =========================================================================
+# 頁面：客戶銷售排行（CR-3；owner / accounting，與其他金額報表同守門）
+# =========================================================================
+@reports_bp.route("/customers")
+@role_required("owner", "accounting")
+def customers():
+    db = get_session()
+    ok_f, date_from, err_f = _parse_date(request.args.get("from"))
+    ok_t, date_to, err_t = _parse_date(request.args.get("to"))
+    error = None
+    if not ok_f or not ok_t:
+        error = err_f or err_t
+        date_from = date_to = None
+    ranking = _customer_ranking(db, date_from, date_to)
+    bound = [r for r in ranking if r["customer_id"] is not None]
+    totals = {
+        "order_count": sum(r["order_count"] for r in ranking),
+        "amount": sum(r["total_amount"] for r in ranking),
+        "customer_count": len(bound),
+    }
+    return render_template(
+        "reports/customers.html", section="customer_ranking",
+        ranking=ranking, totals=totals, error=error,
+        f_from=(request.args.get("from") or "").strip() if ok_f else "",
+        f_to=(request.args.get("to") or "").strip() if ok_t else "",
+    )
 
 
 # =========================================================================
@@ -759,10 +841,25 @@ def _sheet_sales(wb, db, Font, granularity):
                    r["line_count"], r["total_qty"], r["total_amount"]])
 
 
+def _sheet_customers(wb, db, Font):
+    """工作表：客戶排行（CR-3；全期，未綁定客戶另列最後、不編名次）。"""
+    ws = wb.create_sheet("客戶排行")
+    _write_header(ws, ["名次", "客戶", "電話", "訂單數", "累計金額", "最近購買"], Font)
+    rank = 0
+    for r in _customer_ranking(db):
+        if r["customer_id"] is not None:
+            rank += 1
+        ws.append([
+            rank if r["customer_id"] is not None else "",
+            r["name"], r["phone"], r["order_count"], r["total_amount"],
+            r["last_order_at"].strftime("%Y-%m-%d") if r["last_order_at"] else "",
+        ])
+
+
 @reports_bp.route("/export.xlsx")
 @role_required("owner", "accounting")  # 2026-07-12 收緊：金額/毛利相關，staff 不可見
 def export_all():
-    """單鍵匯出：一份 .xlsx，含訂單 / 庫存 / 庫存異動 / 銷售報表 四個工作表。"""
+    """單鍵匯出：一份 .xlsx，含訂單 / 庫存 / 庫存異動 / 銷售報表 / 客戶排行 五個工作表。"""
     db = get_session()
     granularity = request.args.get("g", "month")
     if granularity not in ("day", "month", "year"):
@@ -773,5 +870,6 @@ def export_all():
     _sheet_inventory(wb, db, Font)
     _sheet_movements(wb, db, Font)
     _sheet_sales(wb, db, Font, granularity)
+    _sheet_customers(wb, db, Font)    # CR-3
 
     return _send_xlsx(wb, f"flora_court_{_ts()}.xlsx")

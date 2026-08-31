@@ -165,8 +165,8 @@ def main():
     from openpyxl import load_workbook
     wb = load_workbook(BytesIO(data))
     sheets = wb.sheetnames
-    check("分頁=訂單/庫存/庫存異動/銷售報表",
-          sheets == ["訂單", "庫存", "庫存異動", "銷售報表"], str(sheets))
+    check("分頁=訂單/庫存/庫存異動/銷售報表/客戶排行",
+          sheets == ["訂單", "庫存", "庫存異動", "銷售報表", "客戶排行"], str(sheets))  # CR-3 加客戶排行
     check("無留空白 Sheet 分頁", "Sheet" not in sheets)
 
     # 內容中文 + 數字

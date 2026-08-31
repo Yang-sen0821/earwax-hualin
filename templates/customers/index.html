@@ -14,11 +14,18 @@
     {% endif %}
   {% endwith %}
 
-  <form method="get" style="margin-top:16px;display:flex;gap:8px;">
+  <form method="get" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
     <input name="q" value="{{ q }}" placeholder="搜尋姓名 / 電話 / Email"
            style="flex:1;padding:8px;border:1px solid var(--line);border-radius:8px;">
+    {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
     <button type="submit" style="padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">搜尋</button>
   </form>
+  {# CR-3：排序切換（預設 依建立順序；rank 依累計金額）+ 完整排行入口（owner/accounting） #}
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px;">
+    <a href="{{ url_for('customers.index', q=q or None) }}" style="padding:6px 12px;border-radius:8px;border:1px solid var(--fc);text-decoration:none;{{ 'background:var(--fc);color:#fff;' if sort != 'rank' else 'color:var(--fc);' }}">預設排序</a>
+    <a href="{{ url_for('customers.index', q=q or None, sort='rank') }}" style="padding:6px 12px;border-radius:8px;border:1px solid var(--fc);text-decoration:none;{{ 'background:var(--fc);color:#fff;' if sort == 'rank' else 'color:var(--fc);' }}">依銷售排行</a>
+    {% if show_amount %}<a href="/reports/customers" style="margin-left:auto;color:var(--fc);text-decoration:none;">完整客戶排行（可篩日期）→</a>{% endif %}
+  </div>
 
   <table style="width:100%;margin-top:16px;border-collapse:collapse;">
     <thead>
@@ -26,6 +33,9 @@
         <th style="padding:8px;">姓名</th>
         <th style="padding:8px;">電話</th>
         <th style="padding:8px;">Email</th>
+        <th style="padding:8px;text-align:right;">訂單數</th>
+        {% if show_amount %}<th style="padding:8px;text-align:right;">累計金額</th>{% endif %}
+        <th style="padding:8px;">最近購買</th>
         <th style="padding:8px;">備註</th>
       </tr>
     </thead>
@@ -35,10 +45,14 @@
         <td style="padding:8px;"><a href="{{ url_for('customers.detail', customer_id=c.id) }}" style="color:var(--fc);text-decoration:none;font-weight:600;">{{ c.name }}</a></td>
         <td style="padding:8px;">{{ c.phone or '—' }}</td>
         <td style="padding:8px;">{{ c.email or '—' }}</td>
+        {% set st = stats.get(c.id) %}
+        <td style="padding:8px;text-align:right;">{{ st.order_count if st else 0 }}</td>
+        {% if show_amount %}<td style="padding:8px;text-align:right;">${{ '%.0f'|format(st.total_amount if st else 0) }}</td>{% endif %}
+        <td style="padding:8px;white-space:nowrap;">{{ st.last_order_at.strftime('%Y-%m-%d') if st and st.last_order_at else '—' }}</td>
         <td style="padding:8px;" class="muted">{{ c.note or '' }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted" style="padding:16px;text-align:center;">尚無客戶資料</td></tr>
+      <tr><td colspan="{{ 7 if show_amount else 6 }}" class="muted" style="padding:16px;text-align:center;">尚無客戶資料</td></tr>
       {% endfor %}
     </tbody>
   </table>

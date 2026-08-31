@@ -95,8 +95,20 @@ def index():
             | (Customer.email.like(like))
         )
     customers = query.order_by(Customer.id.desc()).all()
+    # CR-3：每位客戶 訂單數 / 累計金額 / 最近購買（口徑同 reports._customer_ranking）；
+    #        ?sort=rank 依累計金額 desc、次鍵訂單數 desc；預設仍依 id desc。金額欄僅 AMOUNT_ROLES。
+    from blueprints.reports import _customer_ranking
+    stats = {r["customer_id"]: r for r in _customer_ranking(db) if r["customer_id"] is not None}
+    sort = request.args.get("sort") or ""
+    if sort == "rank":
+        customers.sort(key=lambda c: (
+            -(stats[c.id]["total_amount"] if c.id in stats else 0.0),
+            -(stats[c.id]["order_count"] if c.id in stats else 0),
+            -c.id,
+        ))
     return render_template(
-        "customers/index.html", section="customers", customers=customers, q=q
+        "customers/index.html", section="customers", customers=customers, q=q,
+        stats=stats, sort=sort, show_amount=can_see_amount(),
     )
 
 

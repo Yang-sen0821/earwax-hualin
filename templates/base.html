@@ -45,6 +45,7 @@
       {% if session.get('role') in ('owner', 'accounting') %}
       <a href="/reports"   class="{{ 'active' if section=='reports' }}">報表</a>
       <a href="/reports/expenses" class="{{ 'active' if section=='expenses' }}">支出管理</a>
+      <a href="/reports/customers" class="{{ 'active' if section=='customer_ranking' }}">客戶排行</a>
       {% endif %}
       <a href="/m"         class="{{ 'active' if section=='mobile' }}">手機版</a>
       <span class="spacer"></span>

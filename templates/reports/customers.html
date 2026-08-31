@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}客戶銷售排行 — Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:24px; }
+  th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+  th { background:var(--bg); color:#6b6357; font-weight:600; }
+  td.num,th.num { text-align:right; }
+  tr.total td { font-weight:700; background:var(--bg); }
+  tr.unbound td { color:#8a8378; font-style:italic; }
+  .bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  .exp { text-decoration:none; background:#fff; color:var(--fc); border:1px solid var(--fc); padding:8px 14px; border-radius:8px; font-size:14px; }
+  .filter { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .filter input { padding:8px; border:1px solid var(--line); border-radius:8px; }
+  .filter button,.filter a { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; text-decoration:none; color:var(--ink); font-size:14px; }
+</style>
+
+<div class="bar">
+  <h2 style="margin:0;">客戶銷售排行</h2>
+  <a class="exp" href="/reports/export.xlsx">匯出 Excel（含「客戶排行」分頁）</a>
+</div>
+
+{# CR-3：?from=&to=（YYYY-MM-DD，含當日）依建單日篩選；留空 = 全期 #}
+<form method="get" class="filter">
+  <label>從 <input type="date" name="from" value="{{ f_from }}"></label>
+  <label>到 <input type="date" name="to" value="{{ f_to }}"></label>
+  <button type="submit">篩選</button>
+  {% if f_from or f_to %}<a href="/reports/customers">清除（全期）</a>{% endif %}
+  <span class="muted" style="font-size:13px;">口徑：不含{{ VOIDED_LABEL }}單；累計金額不含已退款單、不含運費。</span>
+</form>
+{% if error %}<p style="color:#a33;">{{ error }}</p>{% endif %}
+
+<table>
+  <thead><tr>
+    <th>名次</th><th>客戶</th><th>電話</th>
+    <th class="num">訂單數</th><th class="num">累計金額</th><th>最近購買</th>
+  </tr></thead>
+  <tbody>
+    {% set ns = namespace(rank=0) %}
+    {% for r in ranking %}
+    {% if r.customer_id is not none %}{% set ns.rank = ns.rank + 1 %}{% endif %}
+    <tr class="{{ 'unbound' if r.customer_id is none }}">
+      <td>{{ ns.rank if r.customer_id is not none else '—' }}</td>
+      <td>{% if r.customer_id is not none %}<a href="{{ url_for('customers.detail', customer_id=r.customer_id) }}" style="color:var(--fc);text-decoration:none;font-weight:600;">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
+      <td>{{ r.phone or '—' }}</td>
+      <td class="num">{{ r.order_count }}</td>
+      <td class="num">${{ '%.0f'|format(r.total_amount) }}</td>
+      <td>{{ r.last_order_at.strftime('%Y-%m-%d') if r.last_order_at else '—' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">尚無銷售資料</td></tr>
+    {% endfor %}
+    {% if ranking %}
+    <tr class="total"><td colspan="3">合計（{{ totals.customer_count }} 位客戶）</td>
+      <td class="num">{{ totals.order_count }}</td><td class="num">${{ '%.0f'|format(totals.amount) }}</td><td></td></tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endblock %}
