@@ -31,6 +31,22 @@
       <textarea name="note"></textarea>
     </div>
 
+    {# CR-5：運費 / 運送方式 / 運送備註（選填；運費不進商品合計，另列應收合計） #}
+    <div class="card">
+      <h3>運送（選填）</h3>
+      <label>運送方式</label>
+      <select name="shipping_method">
+        <option value="">—</option>
+        {% for m in shipping_methods %}
+        <option value="{{ m }}">{{ m | shipping_method_label }}</option>
+        {% endfor %}
+      </select>
+      <label>運費（預設 0）</label>
+      <input type="number" name="shipping_fee" min="0" step="1" inputmode="decimal" placeholder="0">
+      <label>運送備註（門市名等）</label>
+      <input type="text" name="shipping_note" maxlength="256" autocomplete="off" placeholder="例：7-11 ○○門市">
+    </div>
+
     <div class="card">
       <h3>品項（缺貨整張取消）</h3>
       <div class="item-line" style="font-size:12px;color:var(--soft)">

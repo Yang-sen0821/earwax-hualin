@@ -28,6 +28,7 @@ from db import (
 )
 from display_labels import (
     combo_label, pool_label, payment_label, shipping_label, mtype_label,
+    shipping_method_label,
 )
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
@@ -95,13 +96,15 @@ def _sales_by_period(db, granularity="month"):
 
     銷售金額採 orders.total_amount（下單當下總額快照）。
     """
-    rows = db.query(Order.created_at, Order.total_amount).all()
+    rows = db.query(Order.created_at, Order.total_amount, Order.shipping_fee).all()
     bucket = {}
-    for created_at, total in rows:
+    for created_at, total, fee in rows:
         key = _period_key(created_at, granularity)
-        b = bucket.setdefault(key, {"period": key, "order_count": 0, "amount": 0.0})
+        b = bucket.setdefault(key, {"period": key, "order_count": 0,
+                                    "amount": 0.0, "shipping_fee": 0.0})
         b["order_count"] += 1
         b["amount"] += _to_float(total)
+        b["shipping_fee"] += _to_float(fee)   # CR-5：代收運費另列，不混入銷售金額
     return sorted(bucket.values(), key=lambda r: r["period"])
 
 
@@ -431,6 +434,7 @@ def sales():
     totals = {
         "order_count": sum(p["order_count"] for p in periods),
         "amount": sum(p["amount"] for p in periods),
+        "shipping_fee": sum(p["shipping_fee"] for p in periods),
     }
     return render_template("reports/sales.html", section="reports",
                            granularity=granularity, periods=periods,
@@ -650,19 +654,28 @@ def _sheet_orders(wb, db, Font):
     """工作表：訂單（首頁，沿用 wb.active，避免留空白 Sheet）。"""
     ws = wb.active
     ws.title = "訂單"
+    # CR-5：總金額=商品實收−折扣（不含運費）；另列 折扣 / 運費 / 運送方式 / 應收合計
     _write_header(ws, [
         "訂單編號", "客戶", "收件人", "電話", "地址",
-        "總金額", "付款狀態", "出貨狀態", "備註", "建立時間",
+        "總金額", "折扣", "運費", "應收合計", "運送方式", "運送備註",
+        "付款狀態", "出貨狀態", "備註", "建立時間",
     ], Font)
     cust = {c.id: c.name for c in db.query(Customer).all()}
     for o in db.query(Order).order_by(Order.id).all():
+        total = _to_float(o.total_amount)
+        fee = _to_float(o.shipping_fee)
         ws.append([
             o.order_no,
             cust.get(o.customer_id, ""),
             o.recipient_name or "",
             o.recipient_phone or "",
             o.shipping_address or "",
-            _to_float(o.total_amount),
+            total,
+            _to_float(o.discount),
+            fee,
+            total + fee,
+            shipping_method_label(o.shipping_method),
+            o.shipping_note or "",
             payment_label(o.payment_status),
             shipping_label(o.shipping_status),
             o.note or "",
@@ -725,9 +738,10 @@ def _sheet_sales(wb, db, Font, granularity):
     # 區塊一：期間銷售
     ws.append([f"期間銷售（{label}）"])
     ws["A1"].font = Font(bold=True)
-    _write_header(ws, [f"期間（{label}）", "訂單數", "銷售金額"], Font)
+    _write_header(ws, [f"期間（{label}）", "訂單數", "銷售金額", "運費", "應收合計"], Font)
     for p in _sales_by_period(db, granularity):
-        ws.append([p["period"], p["order_count"], p["amount"]])
+        ws.append([p["period"], p["order_count"], p["amount"],
+                   p["shipping_fee"], p["amount"] + p["shipping_fee"]])
 
     # 空一列後接區塊二：商品銷售排行
     ws.append([])

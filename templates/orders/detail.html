@@ -17,8 +17,12 @@
     <div><span class="muted">客戶：</span>{% if customer %}<a href="{{ url_for('customers.detail', customer_id=customer.id) }}" style="color:var(--fc);text-decoration:none;">{{ customer.name }}</a>{% else %}—{% endif %}</div>
     <div><span class="muted">收件人：</span>{{ order.recipient_name or '—' }}</div>
     <div><span class="muted">收件電話：</span>{{ order.recipient_phone or '—' }}</div>
-    <div><span class="muted">總金額：</span><strong>{{ order.total_amount }}</strong></div>
+    <div><span class="muted">商品金額（含折扣）：</span><strong>{{ order.total_amount }}</strong>{% if (order.discount or 0) > 0 %} <span class="muted">（折扣 {{ order.discount }}）</span>{% endif %}</div>
     <div style="grid-column:1/3;"><span class="muted">收件地址：</span>{{ order.shipping_address or '—' }}</div>
+    {# CR-5：運費獨立欄、不進總金額；應收合計 = 總金額 + 運費 #}
+    <div><span class="muted">運送方式：</span>{{ (order.shipping_method | shipping_method_label) or '—' }}{% if order.shipping_note %} <span class="muted">（{{ order.shipping_note }}）</span>{% endif %}</div>
+    <div><span class="muted">運費：</span>{{ order.shipping_fee or 0 }}</div>
+    <div><span class="muted">應收合計：</span><strong>{{ (order.total_amount or 0) + (order.shipping_fee or 0) }}</strong></div>
     {% if order.note %}<div style="grid-column:1/3;"><span class="muted">備註：</span>{{ order.note }}</div>{% endif %}
     <div><span class="muted">建立：</span>{{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '' }}</div>
   </div>

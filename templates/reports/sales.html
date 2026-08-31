@@ -26,15 +26,17 @@
 </div>
 
 <table>
-  <thead><tr><th>期間</th><th class="num">訂單數</th><th class="num">銷售金額</th></tr></thead>
+  <thead><tr><th>期間</th><th class="num">訂單數</th><th class="num">銷售金額</th><th class="num">運費</th><th class="num">應收合計</th></tr></thead>
   <tbody>
     {% for p in periods %}
-    <tr><td>{{ p.period }}</td><td class="num">{{ p.order_count }}</td><td class="num">${{ '%.0f'|format(p.amount) }}</td></tr>
+    <tr><td>{{ p.period }}</td><td class="num">{{ p.order_count }}</td><td class="num">${{ '%.0f'|format(p.amount) }}</td>
+        <td class="num">${{ '%.0f'|format(p.shipping_fee) }}</td><td class="num">${{ '%.0f'|format(p.amount + p.shipping_fee) }}</td></tr>
     {% else %}
-    <tr><td colspan="3" class="muted">尚無銷售資料</td></tr>
+    <tr><td colspan="5" class="muted">尚無銷售資料</td></tr>
     {% endfor %}
     {% if periods %}
-    <tr class="total"><td>合計</td><td class="num">{{ totals.order_count }}</td><td class="num">${{ '%.0f'|format(totals.amount) }}</td></tr>
+    <tr class="total"><td>合計</td><td class="num">{{ totals.order_count }}</td><td class="num">${{ '%.0f'|format(totals.amount) }}</td>
+        <td class="num">${{ '%.0f'|format(totals.shipping_fee) }}</td><td class="num">${{ '%.0f'|format(totals.amount + totals.shipping_fee) }}</td></tr>
     {% endif %}
   </tbody>
 </table>

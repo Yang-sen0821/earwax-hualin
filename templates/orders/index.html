@@ -38,6 +38,8 @@
         <th style="padding:8px;">訂單編號</th>
         <th style="padding:8px;">客戶 / 收件人</th>
         <th style="padding:8px;">金額</th>
+        <th style="padding:8px;">運費</th>
+        <th style="padding:8px;">運送方式</th>
         <th style="padding:8px;">付款</th>
         <th style="padding:8px;">出貨</th>
         <th style="padding:8px;">建立時間</th>
@@ -51,12 +53,14 @@
           {% if o.customer_id and cust_map.get(o.customer_id) %}{{ cust_map[o.customer_id].name }}{% else %}{{ o.recipient_name or '—' }}{% endif %}
         </td>
         <td style="padding:8px;">{{ o.total_amount }}</td>
+        <td style="padding:8px;">{{ o.shipping_fee or 0 }}</td>
+        <td style="padding:8px;">{{ (o.shipping_method | shipping_method_label) or '—' }}</td>
         <td style="padding:8px;">{{ o.payment_status | payment_label }}</td>
         <td style="padding:8px;">{{ o.shipping_status | shipping_label }}</td>
         <td style="padding:8px;" class="muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '' }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted" style="padding:16px;text-align:center;">尚無訂單</td></tr>
+      <tr><td colspan="8" class="muted" style="padding:16px;text-align:center;">尚無訂單</td></tr>
       {% endfor %}
     </tbody>
   </table>

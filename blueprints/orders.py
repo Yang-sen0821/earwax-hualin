@@ -51,6 +51,9 @@ SHIPPING_STATUSES = ("pending", "shipped", "delivered", "cancelled")
 # combo_code 欄位沿用，存 LOOSE/BOX；數量=qty，金額=unit_price/subtotal（無 schema 變更）。
 UNIT_CODES = ("LOOSE", "BOX")
 
+# 運送方式閉集（CR-5 2026-08-31）；中文由 display_labels.shipping_method_label
+SHIPPING_METHODS = ("711", "post", "pickup", "other")
+
 
 # -------------------------------------------------------------------------
 # 列表 / 查詢
@@ -119,9 +122,27 @@ def new():
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
         products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
-        unit_codes=UNIT_CODES,
+        unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
         form={},
     )
+
+
+def _parse_shipping_fields():
+    """CR-5：運費 / 運送方式 / 運送備註（皆選填，預設 0 / 空）。
+
+    回 (fields_dict, error)。運送方式非閉集 ⇒ error；運費負數視為 0。
+    """
+    fee = _to_decimal(request.form.get("shipping_fee"), default=0)
+    if fee < 0:
+        fee = Decimal("0")
+    method = (request.form.get("shipping_method") or "").strip() or None
+    if method is not None and method not in SHIPPING_METHODS:
+        return None, f"無效的運送方式：{method}"
+    ship_note = (request.form.get("shipping_note") or "").strip() or None
+    if ship_note and len(ship_note) > 256:
+        return None, "運送備註過長（上限 256 字）"
+    return {"shipping_fee": fee, "shipping_method": method,
+            "shipping_note": ship_note}, None
 
 
 def _create_order(db):
@@ -143,6 +164,12 @@ def _create_order(db):
     shipping_address = (request.form.get("shipping_address") or "").strip()
     note = (request.form.get("note") or "").strip() or None
     discount = _to_decimal(request.form.get("discount"), default=0)
+    if discount < 0:
+        discount = Decimal("0")
+    ship_fields, ship_err = _parse_shipping_fields()
+    if ship_err:
+        flash(ship_err)
+        return _redraw_form(db)
 
     # 多品項：以平行陣列接收
     # combo_codes 改存單位值 LOOSE/BOX；amounts = 該列實收金額（直接金額，非單價×數量）
@@ -203,7 +230,11 @@ def _create_order(db):
         recipient_name=recipient_name or None,
         recipient_phone=recipient_phone or None,
         shipping_address=shipping_address or None,
-        total_amount=total_amount,
+        total_amount=total_amount,      # 商品實收 − 折扣（不含運費）
+        discount=discount,
+        shipping_fee=ship_fields["shipping_fee"],
+        shipping_method=ship_fields["shipping_method"],
+        shipping_note=ship_fields["shipping_note"],
         payment_status="unpaid",
         shipping_status="pending",
         note=note,
@@ -616,7 +647,7 @@ def _redraw_form(db):
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
         products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
-        unit_codes=UNIT_CODES,
+        unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
         form=request.form,
     )
 

@@ -56,6 +56,14 @@ SHIPPING_LABELS = {
     "cancelled": "已取消",
 }
 
+# shipping_method → 中文（CR-5 閉集；值存英文 code）
+SHIPPING_METHOD_LABELS = {
+    "711": "711 店到店",
+    "post": "郵寄",
+    "pickup": "自取",
+    "other": "其他",
+}
+
 # movement_type → 中文（§2.4.1 閉集）
 MTYPE_LABELS = {
     "PURCHASE": "進貨",
@@ -118,6 +126,10 @@ def mtype_label(code):
     return _lookup(MTYPE_LABELS, code)
 
 
+def shipping_method_label(code):
+    return _lookup(SHIPPING_METHOD_LABELS, code)
+
+
 def role_label(code):
     return _lookup(ROLE_LABELS, code)
 
@@ -137,6 +149,7 @@ def register_display_helpers(app):
     app.add_template_filter(payment_label, "payment_label")
     app.add_template_filter(shipping_label, "shipping_label")
     app.add_template_filter(mtype_label, "mtype_label")
+    app.add_template_filter(shipping_method_label, "shipping_method_label")
     app.add_template_filter(role_label, "role_label")
 
     @app.context_processor
@@ -149,5 +162,6 @@ def register_display_helpers(app):
             "PAYMENT_LABELS": PAYMENT_LABELS,
             "SHIPPING_LABELS": SHIPPING_LABELS,
             "MTYPE_LABELS": MTYPE_LABELS,
+            "SHIPPING_METHOD_LABELS": SHIPPING_METHOD_LABELS,
             "ROLE_LABELS": ROLE_LABELS,
         }

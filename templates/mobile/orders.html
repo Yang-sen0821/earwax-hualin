@@ -29,7 +29,7 @@
         <div class="row">
           <div class="grow">
             <div class="ttl2">{{ o.order_no }}</div>
-            <div class="sub">{{ o.recipient_name or '—' }}　${{ '%.0f'|format(o.total_amount or 0) }}</div>
+            <div class="sub">{{ o.recipient_name or '—' }}　${{ '%.0f'|format(o.total_amount or 0) }}{% if (o.shipping_fee or 0) > 0 %}　運費 ${{ '%.0f'|format(o.shipping_fee) }}{% endif %}{% if o.shipping_method %}　{{ o.shipping_method | shipping_method_label }}{% endif %}</div>
             <div class="sub">{{ pay_badge(o.payment_status) }} {{ ship_badge(o.shipping_status) }}</div>
           </div>
           <span>›</span>

@@ -45,6 +45,23 @@
       <textarea name="shipping_address" rows="2" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">{{ form.get('shipping_address','') }}</textarea>
     </label>
 
+    {# CR-5（2026-08-31）：運費 / 運送方式 / 運送備註，皆選填。運費不進總金額，另列「應收合計」。 #}
+    <h3 style="margin-top:24px;">運送</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:10px;">
+      <label>運費（選填，預設 0）
+        <input name="shipping_fee" type="number" step="0.01" min="0" value="{{ form.get('shipping_fee','0') }}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
+      </label>
+      <label>運送方式（選填）
+        <select name="shipping_method" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
+          <option value="">—</option>
+          {% for m in shipping_methods %}<option value="{{ m }}" {{ 'selected' if form.get('shipping_method','')==m }}>{{ m | shipping_method_label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>運送備註（門市名等，選填）
+        <input name="shipping_note" maxlength="256" value="{{ form.get('shipping_note','') }}" placeholder="例：7-11 ○○門市" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
+      </label>
+    </div>
+
     <h3 style="margin-top:24px;">品項</h3>
     <table style="width:100%;border-collapse:collapse;" id="items-table">
       <thead>

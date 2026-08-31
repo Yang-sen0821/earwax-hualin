@@ -43,6 +43,9 @@ SHIPMENT_WRITE_ROLES = ("staff", "warehouse")
 # 建單品項單位閉集（新模型，對齊桌面 orders）：LOOSE=片(扣裸片池)/BOX=盒(扣盒裝池)。
 UNIT_CODES = ("LOOSE", "BOX")
 
+# 運送方式閉集（CR-5，與桌面 orders.SHIPPING_METHODS 同源）
+SHIPPING_METHODS = ("711", "post", "pickup", "other")
+
 
 # -------------------------------------------------------------------------
 # 工具
@@ -204,6 +207,14 @@ def order_new():
             flash("新客戶姓名過長（上限 64 字），訂單未建立")
             return _render_order_new(db)
 
+        # CR-5：運費 / 運送方式 / 運送備註（選填；預設 0 / 空）
+        shipping_fee = _parse_money(request.form.get("shipping_fee"))
+        shipping_method = (request.form.get("shipping_method") or "").strip() or None
+        if shipping_method is not None and shipping_method not in SHIPPING_METHODS:
+            flash(f"無效的運送方式：{shipping_method}")
+            return _render_order_new(db)
+        shipping_note = (request.form.get("shipping_note") or "").strip()[:256] or None
+
         # 解析多品項：product_id[]、combo_code[]（單位 LOOSE/BOX）、qty[]、amount[]（實收金額）
         product_ids = request.form.getlist("product_id")
         combo_codes = request.form.getlist("combo_code")
@@ -256,6 +267,9 @@ def order_new():
                 recipient_phone=recipient_phone or None,
                 shipping_address=shipping_address or None,
                 total_amount=0,
+                shipping_fee=shipping_fee,          # 不進 total_amount（CR-5 口徑 B）
+                shipping_method=shipping_method,
+                shipping_note=shipping_note,
                 payment_status="unpaid",
                 shipping_status="pending",
                 note=note or None,
@@ -321,7 +335,7 @@ def _render_order_new(db):
     return render_template(
         "mobile/order_new.html", section="mobile", user=current_user(),
         customers=customers, products=products,
-        unit_codes=UNIT_CODES,
+        unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
     )
 
 

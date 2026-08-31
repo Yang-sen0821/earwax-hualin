@@ -193,7 +193,13 @@ class Order(Base):
     recipient_name = Column(String(64))
     recipient_phone = Column(String(32))
     shipping_address = Column(String(512))
-    total_amount = Column(Numeric(12, 2), default=0)
+    total_amount = Column(Numeric(12, 2), default=0)   # 商品實收 − 折扣（不含運費，CR-5 口徑 B）
+    # ---- CR-5（2026-08-31）：運費 / 運送方式 / 運送備註 / 折扣落地 ----
+    # 全部有 default 或 nullable，舊資料列讀取不炸；線上 ALTER 見變更清單 §3。
+    shipping_fee = Column(Numeric(12, 2), nullable=False, default=0, server_default="0")  # 代收運費，不進 total_amount
+    shipping_method = Column(String(32))      # 閉集 711/post/pickup/other（中文見 display_labels）
+    shipping_note = Column(String(256))       # 門市名等自由文字
+    discount = Column(Numeric(12, 2), nullable=False, default=0, server_default="0")      # 折扣金額（原表單有欄未落地）
     payment_status = Column(String(20), nullable=False, default="unpaid")   # D4：unpaid/paid/refunded...
     shipping_status = Column(String(20), nullable=False, default="pending")  # D4：pending/shipped/delivered/cancelled
     note = Column(Text)

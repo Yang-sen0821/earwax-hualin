@@ -35,8 +35,15 @@
     {% else %}
       <div class="empty">無品項</div>
     {% endfor %}
-    <div class="row"><div class="grow"><div class="ttl2">合計</div></div>
-      <div class="big">${{ '%.0f'|format(order.total_amount or 0) }}</div></div>
+    <div class="row"><div class="grow"><div class="ttl2">商品合計</div>
+      {% if (order.discount or 0) > 0 %}<div class="sub">已含折扣 ${{ '%.0f'|format(order.discount) }}</div>{% endif %}</div>
+      <div class="ttl2">${{ '%.0f'|format(order.total_amount or 0) }}</div></div>
+    {# CR-5：運費另列，不進商品合計 #}
+    <div class="row"><div class="grow"><div class="ttl2">運費</div>
+      <div class="sub">{{ (order.shipping_method | shipping_method_label) or '—' }}{% if order.shipping_note %}（{{ order.shipping_note }}）{% endif %}</div></div>
+      <div class="ttl2">${{ '%.0f'|format(order.shipping_fee or 0) }}</div></div>
+    <div class="row"><div class="grow"><div class="ttl2">應收合計</div></div>
+      <div class="big">${{ '%.0f'|format((order.total_amount or 0) + (order.shipping_fee or 0)) }}</div></div>
   </div>
 
   <div class="card">
