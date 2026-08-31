@@ -10,15 +10,72 @@
 """
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, abort,
+    session as flask_session,
 )
 
 from auth import login_required, role_required, current_user
-from db import get_session, Customer, CustomerAddress, Order, active_orders
+from db import (
+    get_session, Customer, CustomerAddress, Order, OrderItem, Product,
+    active_orders,
+)
 
 customers_bp = Blueprint("customers", __name__, url_prefix="/customers")
 
 # 可寫角色（owner 由 role_required 自動通過）
 WRITE_ROLES = ("staff",)
+
+# CR-2/CR-3（森哥 2026-08-31 口徑）：客戶頁金額欄（單筆金額、運費、累計金額、排行金額）
+# 只給 owner / accounting 看；staff 等其他角色只看訂單數與最近購買。
+# 判斷來源 = session role（登入時寫入，與 base.html 導覽同一手法）。
+AMOUNT_ROLES = ("owner", "accounting")
+
+
+def can_see_amount():
+    """目前登入者是否可看客戶頁金額欄（session role 判斷）。"""
+    return flask_session.get("role") in AMOUNT_ROLES
+
+
+def customer_orders_with_items(db, customer_id, include_voided=False):
+    """CR-2：某客戶的訂單列表 + 每單品項（桌面 / 手機共用）。
+
+    回 (orders, items_map)：
+      orders    — 依 id desc；預設排除作廢單（active_orders），include_voided=True 則全列
+      items_map — {order_id: [{"product_name", "combo_code", "qty"}]}，供模板列「商品名 片/盒×qty」
+    """
+    query = db.query(Order).filter(Order.customer_id == customer_id)
+    if not include_voided:
+        query = active_orders(query)
+    orders = query.order_by(Order.id.desc()).all()
+    items_map = {}
+    ids = [o.id for o in orders]
+    if ids:
+        rows = (
+            db.query(OrderItem.order_id, Product.name, OrderItem.combo_code, OrderItem.qty)
+            .join(Product, Product.id == OrderItem.product_id)
+            .filter(OrderItem.order_id.in_(ids))
+            .order_by(OrderItem.order_id, OrderItem.id)
+            .all()
+        )
+        for oid, pname, combo, qty in rows:
+            items_map.setdefault(oid, []).append(
+                {"product_name": pname, "combo_code": combo, "qty": qty}
+            )
+    return orders, items_map
+
+
+def customer_summary(orders):
+    """CR-2 客戶小計（口徑與 reports._customer_ranking 一致）：
+      訂單數     = 非作廢單數（含已退款單；作廢單即使被列出也不計）
+      累計金額   = 非作廢 且 非 refunded 的 total_amount 合計（不含運費）
+      最近購買日 = 最近一筆非作廢單的 created_at
+    """
+    active = [o for o in orders if o.voided_at is None]
+    total = 0.0
+    for o in active:
+        if o.payment_status != "refunded":
+            total += float(o.total_amount or 0)
+    last = max((o.created_at for o in active if o.created_at), default=None)
+    return {"order_count": len(active), "total_amount": total, "last_order_at": last}
 
 
 # -------------------------------------------------------------------------
@@ -59,16 +116,18 @@ def detail(customer_id):
         .order_by(CustomerAddress.is_default.desc(), CustomerAddress.id.asc())
         .all()
     )
-    # CR-4：作廢單不列入客戶歷史訂單（刪除保護仍看全部，含作廢，見 delete）
-    orders = (
-        active_orders(db.query(Order))
-        .filter_by(customer_id=customer_id)
-        .order_by(Order.id.desc())
-        .all()
-    )
+    # CR-4：作廢單預設不列（與訂單列表同口徑：?show_voided=1 灰字列出、不計入小計）；
+    #        刪除保護仍看全部（含作廢），見 delete。
+    # CR-2：加日期 / 品項 / 運費欄 + 客戶小計；金額欄僅 owner/accounting（AMOUNT_ROLES）。
+    show_voided = request.args.get("show_voided") == "1"
+    orders, items_map = customer_orders_with_items(
+        db, customer_id, include_voided=show_voided)
+    summary = customer_summary(orders)
     return render_template(
         "customers/detail.html", section="customers",
         customer=customer, addresses=addresses, orders=orders,
+        items_map=items_map, summary=summary,
+        show_voided=show_voided, show_amount=can_see_amount(),
     )
 
 

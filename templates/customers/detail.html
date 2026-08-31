@@ -72,28 +72,56 @@
   </form>
 </div>
 
-<!-- 歷史訂單 -->
+<!-- 歷史訂單（CR-2：日期 / 品項 / 運費 + 客戶小計；金額欄僅 owner/accounting） -->
 <div class="card" style="margin-top:16px;">
-  <h3 style="margin-top:0;">歷史訂單</h3>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <h3 style="margin:0;flex:1;">歷史訂單</h3>
+    <form method="get" style="display:inline;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:14px;">
+        <input type="checkbox" name="show_voided" value="1" {{ 'checked' if show_voided }} onchange="this.form.submit()"> 顯示{{ VOIDED_LABEL }}單
+      </label>
+    </form>
+  </div>
+
+  {# 客戶小計：作廢單與已退款單不計入累計 #}
+  <div style="display:flex;gap:24px;flex-wrap:wrap;margin:12px 0 4px;">
+    <div><span class="muted" style="font-size:13px;">訂單數</span><div style="font-size:20px;font-weight:700;color:var(--fc);">{{ summary.order_count }}</div></div>
+    {% if show_amount %}
+    <div><span class="muted" style="font-size:13px;">累計金額</span><div style="font-size:20px;font-weight:700;color:var(--fc);">${{ '%.0f'|format(summary.total_amount) }}</div></div>
+    {% endif %}
+    <div><span class="muted" style="font-size:13px;">最近購買</span><div style="font-size:20px;font-weight:700;color:var(--fc);">{{ summary.last_order_at.strftime('%Y-%m-%d') if summary.last_order_at else '—' }}</div></div>
+  </div>
+  {% if show_amount %}<p class="muted" style="margin:0 0 8px;font-size:12px;">累計金額 = 商品實收（不含運費），不含{{ VOIDED_LABEL }}單與已退款單。</p>{% endif %}
+
   <table style="width:100%;border-collapse:collapse;">
     <thead>
       <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        <th style="padding:8px;">日期</th>
         <th style="padding:8px;">訂單編號</th>
-        <th style="padding:8px;">金額</th>
+        <th style="padding:8px;">品項</th>
+        {% if show_amount %}
+        <th style="padding:8px;text-align:right;">金額</th>
+        <th style="padding:8px;text-align:right;">運費</th>
+        {% endif %}
         <th style="padding:8px;">付款</th>
         <th style="padding:8px;">出貨</th>
       </tr>
     </thead>
     <tbody>
       {% for o in orders %}
-      <tr style="border-bottom:1px solid var(--line);">
-        <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:var(--fc);text-decoration:none;">{{ o.order_no }}</a></td>
-        <td style="padding:8px;">{{ o.total_amount }}</td>
+      <tr style="border-bottom:1px solid var(--line);{% if o.voided_at %}color:#a09a91;text-decoration:line-through;{% endif %}">
+        <td style="padding:8px;white-space:nowrap;">{{ o.created_at.strftime('%Y-%m-%d') if o.created_at else '—' }}</td>
+        <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:{{ '#a09a91' if o.voided_at else 'var(--fc)' }};text-decoration:none;">{{ o.order_no }}</a>{% if o.voided_at %} <span style="font-size:12px;color:#a33;text-decoration:none;display:inline-block;">{{ VOIDED_LABEL }}</span>{% endif %}</td>
+        <td style="padding:8px;">{% for it in items_map.get(o.id, []) %}{{ it.product_name }} {{ it.combo_code | combo_label }}×{{ it.qty }}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</td>
+        {% if show_amount %}
+        <td style="padding:8px;text-align:right;">${{ '%.0f'|format(o.total_amount or 0) }}</td>
+        <td style="padding:8px;text-align:right;">${{ '%.0f'|format(o.shipping_fee or 0) }}</td>
+        {% endif %}
         <td style="padding:8px;">{{ o.payment_status | payment_label }}</td>
         <td style="padding:8px;">{{ o.shipping_status | shipping_label }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted" style="padding:12px;text-align:center;">尚無訂單</td></tr>
+      <tr><td colspan="{{ 7 if show_amount else 5 }}" class="muted" style="padding:12px;text-align:center;">尚無訂單</td></tr>
       {% endfor %}
     </tbody>
   </table>

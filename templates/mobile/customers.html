@@ -13,13 +13,17 @@
   <div class="card">
     {% if customers %}
       {% for c in customers %}
+      {# CR-2：每列連到客戶明細（交易紀錄） #}
+      <a class="itemlink" href="/m/customers/{{ c.id }}">
       <div class="row">
         <div class="grow">
           <div class="ttl2">{{ c.name }}</div>
           <div class="sub">{{ c.phone or '—' }}{% if c.email %}　{{ c.email }}{% endif %}</div>
           {% if c.note %}<div class="sub">{{ c.note }}</div>{% endif %}
         </div>
+        <div class="sub">›</div>
       </div>
+      </a>
       {% endfor %}
     {% else %}
       <div class="empty">{{ '查無客戶' if kw else '尚無客戶資料' }}</div>

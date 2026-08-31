@@ -1,0 +1,54 @@
+{% extends "mobile/_base.html" %}
+{% block title %}{{ customer.name }} — 客戶明細{% endblock %}
+{% block heading %}{{ customer.name }}{% endblock %}
+{% block back %}<a href="/m/customers" class="back">‹</a>{% endblock %}
+{% set active_tab = 'customers' %}
+{% block content %}
+  {# CR-2 手機客戶明細：客戶資料 + 交易紀錄；作廢單不列、不計小計；金額欄僅 owner/accounting #}
+  <div class="card">
+    <h3>客戶資料</h3>
+    <div class="row"><div class="grow"><div class="sub">電話</div>
+      <div class="ttl2">{{ customer.phone or '—' }}</div></div></div>
+    <div class="row"><div class="grow"><div class="sub">Email</div>
+      <div class="ttl2">{{ customer.email or '—' }}</div></div></div>
+    {% if customer.note %}
+    <div class="row"><div class="grow"><div class="sub">備註</div>
+      <div class="ttl2">{{ customer.note }}</div></div></div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>交易小計</h3>
+    <div class="row"><div class="grow ttl2">訂單數</div><div class="big">{{ summary.order_count }}</div></div>
+    {% if show_amount %}
+    <div class="row"><div class="grow"><div class="ttl2">累計金額</div><div class="sub">不含運費、不含{{ VOIDED_LABEL }}與已退款單</div></div>
+      <div class="big">${{ '%.0f'|format(summary.total_amount) }}</div></div>
+    {% endif %}
+    <div class="row"><div class="grow ttl2">最近購買</div>
+      <div class="ttl2">{{ summary.last_order_at.strftime('%Y-%m-%d') if summary.last_order_at else '—' }}</div></div>
+  </div>
+
+  <div class="card">
+    <h3>交易紀錄</h3>
+    {% for o in orders %}
+    <a class="itemlink" href="/m/orders/{{ o.id }}">
+      <div class="row">
+        <div class="grow">
+          <div class="ttl2">{{ o.order_no }}</div>
+          <div class="sub">{{ o.created_at.strftime('%Y-%m-%d') if o.created_at else '—' }}</div>
+          <div class="sub">{% for it in items_map.get(o.id, []) %}{{ it.product_name }} {{ it.combo_code | combo_label }}×{{ it.qty }}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</div>
+          <div class="sub" style="margin-top:4px;">
+            <span class="badge {{ 'b-paid' if o.payment_status=='paid' else ('b-unpaid' if o.payment_status=='unpaid' else 'b-other') }}">{{ o.payment_status | payment_label }}</span>
+            <span class="badge {{ 'b-shipped' if o.shipping_status in ('shipped','delivered') else ('b-pending' if o.shipping_status=='pending' else 'b-other') }}">{{ o.shipping_status | shipping_label }}</span>
+          </div>
+        </div>
+        {% if show_amount %}
+        <div class="ttl2" style="white-space:nowrap;">${{ '%.0f'|format(o.total_amount or 0) }}</div>
+        {% endif %}
+      </div>
+    </a>
+    {% else %}
+      <div class="empty">尚無訂單</div>
+    {% endfor %}
+  </div>
+{% endblock %}

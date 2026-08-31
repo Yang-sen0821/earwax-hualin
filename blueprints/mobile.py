@@ -9,6 +9,7 @@
 - /m/inventory           三池庫存摘要（boxed / loose_piece / paper_bag）
 - /m/shipments           待出貨列表 + 出貨（呼叫 deduct_for_shipment，§4.4）
 - /m/customers           客戶查詢
+- /m/customers/<id>      客戶明細（CR-2：客戶資料 + 交易紀錄；金額欄僅 owner/accounting）
 
 模組層鐵律：
 - 任何庫存量變動一律呼叫 inventory_service §4 契約函式（deduct_for_sale / deduct_for_shipment）。
@@ -540,6 +541,29 @@ def customers():
     return render_template(
         "mobile/customers.html", section="mobile", user=current_user(),
         customers=rows, kw=kw,
+    )
+
+
+@mobile_bp.route("/customers/<int:customer_id>")
+@login_required
+def customer_detail(customer_id):
+    """CR-2 手機客戶明細：客戶資料 + 訂單列表（日期 / 單號 / 品項 / 金額 / 狀態）。
+
+    口徑同桌面 customers.detail：作廢單不列、不計小計；金額欄僅 owner/accounting。
+    """
+    from blueprints.customers import (
+        customer_orders_with_items, customer_summary, can_see_amount,
+    )
+    db = get_session()
+    customer = db.query(Customer).filter_by(id=customer_id).first()
+    if not customer:
+        abort(404)
+    orders, items_map = customer_orders_with_items(db, customer_id)
+    summary = customer_summary(orders)
+    return render_template(
+        "mobile/customer_detail.html", section="mobile", user=current_user(),
+        customer=customer, orders=orders, items_map=items_map,
+        summary=summary, show_amount=can_see_amount(),
     )
 
 
