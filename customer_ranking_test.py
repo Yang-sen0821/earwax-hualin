@@ -172,8 +172,9 @@ def main():
     resp = c.get("/reports/export.xlsx")
     from openpyxl import load_workbook
     wb = load_workbook(BytesIO(resp.get_data()))
-    check("D Excel 分頁含「客戶排行」且順序在最後",
-          wb.sheetnames == ["訂單", "庫存", "庫存異動", "銷售報表", "客戶排行"], str(wb.sheetnames))
+    check("D Excel 分頁含「客戶排行」且順序在銷售報表之後",
+          "客戶排行" in wb.sheetnames
+          and wb.sheetnames.index("客戶排行") == wb.sheetnames.index("銷售報表") + 1, str(wb.sheetnames))  # CR-8 後另有「操作紀錄」在最後
     ws = wb["客戶排行"]
     rows = [[cell.value for cell in row] for row in ws.iter_rows()]
     check("D 客戶排行表頭", rows[0] == ["名次", "客戶", "電話", "訂單數", "累計金額", "最近購買"], str(rows[0]))

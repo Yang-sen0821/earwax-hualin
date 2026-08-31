@@ -14,6 +14,7 @@ from blueprints.customers import customers_bp
 from blueprints.reports import reports_bp
 from blueprints.earwax_sales import earwax_sales_bp
 from blueprints.mobile import mobile_bp
+from blueprints.audit_log import audit_bp, mobile_audit_bp
 from display_labels import register_display_helpers
 from db import SessionLocal
 
@@ -34,8 +35,10 @@ def create_app():
     app.register_blueprint(customers_bp)   # /customers
     app.register_blueprint(reports_bp)     # /reports
     app.register_blueprint(earwax_sales_bp)  # /earwax-sales（甲案：愛啪啪獨立紀錄）
+    app.register_blueprint(audit_bp)         # /admin/audit（CR-8 操作紀錄；owner/accounting）
     if Config.ENABLE_MOBILE:
         app.register_blueprint(mobile_bp)  # /m
+        app.register_blueprint(mobile_audit_bp)  # /m/audit（CR-8 手機簡版）
 
     # ---- D1：愛啪啪入口可逆隱藏（false 時完全不註冊 earwax，不 import earwax）----
     if Config.ENABLE_EARWAX_ENTRY:

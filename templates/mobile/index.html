@@ -26,6 +26,12 @@
       <div class="row"><div class="grow"><div class="ttl2">👤 客戶查詢</div>
         <div class="sub">依姓名 / 電話搜尋</div></div><span>›</span></div>
     </a>
+    {% if user and user.role in ('owner', 'accounting') %}
+    <a class="itemlink" href="/m/audit">
+      <div class="row"><div class="grow"><div class="ttl2">🧾 操作紀錄</div>
+        <div class="sub">誰在何時做過什麼（最近 100 筆）</div></div><span>›</span></div>
+    </a>
+    {% endif %}
   </div>
   <div class="card">
     <a class="btn btn-ghost" href="/">回桌面後台</a>

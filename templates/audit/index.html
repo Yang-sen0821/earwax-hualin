@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}操作紀錄 — Flora Court ERP{% endblock %}
+{% block content %}
+<style>
+  .bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  .exp { text-decoration:none; background:#fff; color:var(--fc); border:1px solid var(--fc); padding:8px 14px; border-radius:8px; font-size:14px; }
+  .filter { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .filter label { font-size:13px; color:#6b6357; }
+  .filter input,.filter select { padding:8px; border:1px solid var(--line); border-radius:8px; background:#fff; font-size:14px; }
+  .filter button,.filter a { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; text-decoration:none; color:var(--ink); font-size:14px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:16px; }
+  th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; vertical-align:top; }
+  th { background:var(--bg); color:#6b6357; font-weight:600; white-space:nowrap; }
+  td.ts { white-space:nowrap; color:#6b6357; font-variant-numeric:tabular-nums; }
+  td.act { white-space:nowrap; font-weight:600; }
+  td.sum { max-width:520px; word-break:break-all; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--bg); color:#6b6357; margin-right:4px; }
+  a.tgt { color:var(--fc); text-decoration:none; font-weight:600; }
+  details summary { cursor:pointer; color:var(--fc); font-size:13px; }
+  details pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:12px; max-height:320px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:6px 0 0; }
+  .pager { display:flex; justify-content:space-between; align-items:center; font-size:14px; color:#6b6357; }
+  .pager a { color:var(--fc); text-decoration:none; padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .pager span.dis { opacity:.4; padding:8px 14px; }
+</style>
+
+<div class="bar">
+  <h2 style="margin:0;">操作紀錄</h2>
+  <a class="exp" href="/reports/export.xlsx">匯出 Excel（含「操作紀錄」分頁，最近 1000 筆）</a>
+</div>
+
+{# CR-8：篩選（日期 from/to 台北日界線、帳號、動作類型、對象/關鍵字）；留空 = 全部 #}
+<form method="get" class="filter">
+  <label>從 <input type="date" name="from" value="{{ filters.from }}"></label>
+  <label>到 <input type="date" name="to" value="{{ filters.to }}"></label>
+  <label>帳號
+    <select name="actor">
+      <option value="">全部</option>
+      {% for u in users %}
+      <option value="{{ u.id }}" {{ 'selected' if filters.actor == u.id|string }}>{{ u.display_name or u.username }}（{{ u.username }}）</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>動作
+    <select name="action">
+      <option value="">全部</option>
+      {% for code, label in actions %}
+      <option value="{{ code }}" {{ 'selected' if filters.action == code }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>對象／關鍵字 <input type="text" name="q" value="{{ filters.q }}" placeholder="單號、ID、名稱…" size="16"></label>
+  <button type="submit">篩選</button>
+  {% if filters.from or filters.to or filters.actor or filters.action or filters.q %}<a href="/admin/audit/">清除</a>{% endif %}
+  <span class="muted" style="font-size:13px;">共 {{ total }} 筆；時間為台北時間。</span>
+</form>
+{% if filters.error %}<p style="color:#a33;">{{ filters.error }}</p>{% endif %}
+
+<table>
+  <thead><tr>
+    <th>時間</th><th>帳號</th><th>動作</th><th>對象</th><th>摘要</th><th></th>
+  </tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="ts">{{ r.ts }}</td>
+      <td>{{ r.actor }}</td>
+      <td class="act">{{ r.action_label }}</td>
+      <td>
+        <span class="tag">{{ r.target_type_label or '—' }}</span>
+        {% if r.target_url %}<a class="tgt" href="{{ r.target_url }}">{{ r.target_label or ('#' ~ r.target_id) }}</a>
+        {% else %}{{ r.target_label or (r.target_id or '') }}{% endif %}
+        {% if r.target_label and r.target_id %}<span class="muted" style="font-size:12px;"> #{{ r.target_id }}</span>{% endif %}
+      </td>
+      <td class="sum">{{ r.summary }}</td>
+      <td>{% if r.detail_json %}<details><summary>詳細</summary><pre>{{ r.detail_json }}</pre></details>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">沒有符合條件的紀錄</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pager">
+  {% if prev_url %}<a href="{{ prev_url }}">‹ 上一頁</a>{% else %}<span class="dis">‹ 上一頁</span>{% endif %}
+  <span>第 {{ page }} / {{ pages }} 頁（每頁 {{ page_size }} 筆）</span>
+  {% if next_url %}<a href="{{ next_url }}">下一頁 ›</a>{% else %}<span class="dis">下一頁 ›</span>{% endif %}
+</div>
+{% endblock %}

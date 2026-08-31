@@ -873,10 +873,35 @@ def _sheet_customers(wb, db, Font):
         ])
 
 
+AUDIT_EXPORT_LIMIT = 1000
+
+
+def _sheet_audit(wb, db, Font):
+    """工作表：操作紀錄（CR-8；最近 1000 筆，時間降冪，台北時間；摘要沿用 audit_util.summarize）。"""
+    from db import AuditLog, User
+    from audit_util import fmt_ts, parse_detail
+    ws = wb.create_sheet("操作紀錄")
+    _write_header(ws, ["時間", "帳號", "動作", "對象類型", "對象ID", "摘要", "詳細(JSON)"], Font)
+    users = {u.id: u for u in db.query(User).all()}
+    logs = (db.query(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(AUDIT_EXPORT_LIMIT).all())
+    for a in logs:
+        u = users.get(a.actor_id) if a.actor_id else None
+        actor = a.actor_name or (u.display_name if u else None) or (u.username if u else None) or "system"
+        if u and u.username and u.username != actor:
+            actor = f"{actor}（{u.username}）"
+        d = parse_detail(a.detail)
+        ws.append([
+            fmt_ts(a.created_at), actor, action_label(a.action),
+            target_type_label(a.target_type), a.target_id or "",
+            summarize(a.action, d), (a.detail or "")[:32000],
+        ])
+
+
 @reports_bp.route("/export.xlsx")
 @role_required("owner", "accounting")  # 2026-07-12 收緊：金額/毛利相關，staff 不可見
 def export_all():
-    """單鍵匯出：一份 .xlsx，含訂單 / 庫存 / 庫存異動 / 銷售報表 / 客戶排行 五個工作表。"""
+    """單鍵匯出：一份 .xlsx，含訂單 / 庫存 / 庫存異動 / 銷售報表 / 客戶排行 / 操作紀錄 六個工作表。"""
     db = get_session()
     granularity = request.args.get("g", "month")
     if granularity not in ("day", "month", "year"):
@@ -888,5 +913,6 @@ def export_all():
     _sheet_movements(wb, db, Font)
     _sheet_sales(wb, db, Font, granularity)
     _sheet_customers(wb, db, Font)    # CR-3
+    _sheet_audit(wb, db, Font)        # CR-8
 
     return _send_xlsx(wb, f"flora_court_{_ts()}.xlsx")
