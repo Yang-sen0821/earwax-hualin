@@ -8,9 +8,22 @@
   {% endif %}
 {% endwith %}
 
-<div class="card">
+{% if is_voided %}
+{# CR-4：作廢單（軟刪除）灰底標示；不刪 items / payments / shipments #}
+<div class="card" style="margin-bottom:16px;background:#f3f1ee;color:#6b6259;border:1px solid #d9d4cc;">
+  <strong>{{ VOIDED_LABEL }}</strong>　{{ order.voided_at.strftime('%Y-%m-%d %H:%M') if order.voided_at else '' }}
+  {% if order.void_reason %}　原因：{{ order.void_reason }}{% endif %}
+  <div class="muted" style="font-size:13px;margin-top:4px;">此單不計入任何統計；狀態與內容已鎖定。</div>
+</div>
+{% endif %}
+
+<div class="card"{% if is_voided %} style="color:#8a8378;"{% endif %}>
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-    <h2 style="margin:0;flex:1;">訂單 {{ order.order_no }}</h2>
+    <h2 style="margin:0;flex:1;">訂單 {{ order.order_no }}{% if is_voided %} <span style="font-size:14px;color:#a33;">（{{ VOIDED_LABEL }}）</span>{% endif %}</h2>
+    {% if not is_voided and can_write %}
+    <a href="{{ url_for('orders.edit', order_id=order.id) }}"
+       style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">編輯{{ '（僅收件/運費/備註）' if is_shipped }}</a>
+    {% endif %}
     <a href="{{ url_for('orders.index') }}" style="color:var(--fc);text-decoration:none;">← 返回列表</a>
   </div>
   <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -56,6 +69,7 @@
   </table>
 </div>
 
+{% if not is_voided %}
 <div class="card" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:24px;">
   <div>
     <h3 style="margin-top:0;">付款狀態</h3>
@@ -70,13 +84,34 @@
   <div>
     <h3 style="margin-top:0;">出貨狀態</h3>
     <p class="muted">目前：<strong>{{ order.shipping_status | shipping_label }}</strong></p>
-    <form method="post" action="{{ url_for('orders.update_shipping', order_id=order.id) }}" style="display:flex;gap:8px;">
+    <form method="post" action="{{ url_for('orders.update_shipping', order_id=order.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;">
       <select name="shipping_status" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
         {% for s in shipping_statuses %}<option value="{{ s }}" {{ 'selected' if order.shipping_status==s }}>{{ s | shipping_label }}</option>{% endfor %}
       </select>
+      <input name="carrier" placeholder="物流商（選填）" style="width:120px;padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input name="tracking_no" placeholder="追蹤碼（選填）" style="width:140px;padding:8px;border:1px solid var(--line);border-radius:8px;">
       <button type="submit" style="background:var(--fc);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">更新</button>
     </form>
-    <p class="muted" style="font-size:13px;margin-top:8px;">設為 shipped 時，系統會在同一交易內扣紙袋（§4.4）；紙袋不足將擋下出貨。</p>
+    <p class="muted" style="font-size:13px;margin-top:8px;">設為「已出貨」時，系統會在同一交易內扣紙袋並建立出貨紀錄（§4.4）；紙袋不足將擋下出貨。取消訂單請用下方「作廢」。</p>
   </div>
 </div>
+
+{# CR-4：作廢（軟刪除）。未出貨 staff+owner 可作廢並全額回補；已出貨限 owner 且不回補。 #}
+{% if can_void %}
+<div class="card" style="margin-top:16px;border:1px solid #d9b0b0;">
+  <h3 style="margin-top:0;color:#a33;">作廢訂單</h3>
+  <p class="muted" style="font-size:13px;">
+    {% if is_shipped %}此單已出貨：作廢後<strong>不回補庫存</strong>（貨與袋已出門，退貨另走入庫），不計入統計；已付款會改為已退款。
+    {% else %}作廢後品項庫存<strong>全額回補</strong>至可售池、不計入任何統計；已付款會改為已退款。原始明細與收款/出貨紀錄保留供查。{% endif %}
+  </p>
+  <form method="post" action="{{ url_for('orders.void', order_id=order.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;"
+        onsubmit="return confirm('確定作廢訂單 {{ order.order_no }}？此動作不可復原。');">
+    <input name="reason" required maxlength="256" placeholder="作廢原因（必填）" style="flex:1;min-width:220px;padding:8px;border:1px solid var(--line);border-radius:8px;">
+    <button type="submit" style="background:#a33;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">作廢</button>
+  </form>
+</div>
+{% elif is_shipped and can_write %}
+<p class="muted" style="margin-top:16px;font-size:13px;">此單已出貨，作廢需由老闆（owner）操作。</p>
+{% endif %}
+{% endif %}
 {% endblock %}

@@ -20,15 +20,19 @@
       <option value="pending" {{ 'selected' if ship=='pending' }}>待出</option>
       <option value="shipped" {{ 'selected' if ship=='shipped' }}>已出</option>
     </select>
+    <select name="voided" onchange="this.form.submit()">
+      <option value="">不含{{ VOIDED_LABEL }}</option>
+      <option value="1" {{ 'selected' if show_voided }}>含{{ VOIDED_LABEL }}</option>
+    </select>
   </form>
 
   <div class="card">
     {% if orders %}
       {% for o in orders %}
-      <a class="itemlink" href="/m/orders/{{ o.id }}">
+      <a class="itemlink" href="/m/orders/{{ o.id }}"{% if o.voided_at %} style="color:#a09a91;"{% endif %}>
         <div class="row">
           <div class="grow">
-            <div class="ttl2">{{ o.order_no }}</div>
+            <div class="ttl2">{{ o.order_no }}{% if o.voided_at %} <span class="badge b-other" style="color:#a33;">{{ VOIDED_LABEL }}</span>{% endif %}</div>
             <div class="sub">{{ o.recipient_name or '—' }}　${{ '%.0f'|format(o.total_amount or 0) }}{% if (o.shipping_fee or 0) > 0 %}　運費 ${{ '%.0f'|format(o.shipping_fee) }}{% endif %}{% if o.shipping_method %}　{{ o.shipping_method | shipping_method_label }}{% endif %}</div>
             <div class="sub">{{ pay_badge(o.payment_status) }} {{ ship_badge(o.shipping_status) }}</div>
           </div>

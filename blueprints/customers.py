@@ -13,7 +13,7 @@ from flask import (
 )
 
 from auth import login_required, role_required, current_user
-from db import get_session, Customer, CustomerAddress, Order
+from db import get_session, Customer, CustomerAddress, Order, active_orders
 
 customers_bp = Blueprint("customers", __name__, url_prefix="/customers")
 
@@ -59,8 +59,9 @@ def detail(customer_id):
         .order_by(CustomerAddress.is_default.desc(), CustomerAddress.id.asc())
         .all()
     )
+    # CR-4：作廢單不列入客戶歷史訂單（刪除保護仍看全部，含作廢，見 delete）
     orders = (
-        db.query(Order)
+        active_orders(db.query(Order))
         .filter_by(customer_id=customer_id)
         .order_by(Order.id.desc())
         .all()

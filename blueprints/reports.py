@@ -24,7 +24,7 @@ from db import (
     Order, OrderItem, Product, SalesPlan, Customer,
     InventoryBalance, InventoryMovement,
     FinancialEntry, ExtraExpense, Setting,
-    COMBO_CODES,
+    COMBO_CODES, active_orders,
 )
 from display_labels import (
     combo_label, pool_label, payment_label, shipping_label, mtype_label,
@@ -96,7 +96,8 @@ def _sales_by_period(db, granularity="month"):
 
     銷售金額採 orders.total_amount（下單當下總額快照）。
     """
-    rows = db.query(Order.created_at, Order.total_amount, Order.shipping_fee).all()
+    # CR-4：作廢單排除於統計
+    rows = active_orders(db.query(Order.created_at, Order.total_amount, Order.shipping_fee)).all()
     bucket = {}
     for created_at, total, fee in rows:
         key = _period_key(created_at, granularity)
@@ -113,12 +114,16 @@ def _sales_by_period(db, granularity="month"):
 # =========================================================================
 def _sales_ranking(db):
     label = _combo_label_map(db)
+    # CR-4：join orders 排除作廢單
     rows = (
-        db.query(
-            OrderItem.combo_code,
-            func.count(OrderItem.id),
-            func.coalesce(func.sum(OrderItem.qty), 0),
-            func.coalesce(func.sum(OrderItem.subtotal), 0),
+        active_orders(
+            db.query(
+                OrderItem.combo_code,
+                func.count(OrderItem.id),
+                func.coalesce(func.sum(OrderItem.qty), 0),
+                func.coalesce(func.sum(OrderItem.subtotal), 0),
+            )
+            .join(Order, Order.id == OrderItem.order_id)
         )
         .group_by(OrderItem.combo_code)
         .all()
@@ -142,7 +147,7 @@ def _sales_ranking(db):
 def _inventory_report(db):
     """彙整各 (商品 × 池) 的庫存切片：
       - 目前(normal) / 預留(reserved) / 公關品(pr) / 試用(trial) / 損耗(scrap)
-      - 已售：由 inventory_movements movement_type=SALE 的 |qty_delta| 累計
+      - 已售：由 inventory_movements SALE（負）+ SALE_REVERSAL（正，CR-4 回補）淨額取絕對值
     """
     # balances：依 product 聚合各 category
     bal_rows = (
@@ -155,17 +160,17 @@ def _inventory_report(db):
         )
         .all()
     )
-    # 已售：SALE 異動累計（qty_delta 為負，取絕對值）
+    # 已售：SALE（負）+ SALE_REVERSAL（正）淨額；編輯/作廢回補後已售自動扣回（CR-4）
     sold_rows = (
         db.query(
             InventoryMovement.product_id,
             func.coalesce(func.sum(InventoryMovement.qty_delta), 0),
         )
-        .filter(InventoryMovement.movement_type == "SALE")
+        .filter(InventoryMovement.movement_type.in_(("SALE", "SALE_REVERSAL")))
         .group_by(InventoryMovement.product_id)
         .all()
     )
-    sold_map = {pid: abs(int(s or 0)) for pid, s in sold_rows}
+    sold_map = {pid: max(0, -int(s or 0)) for pid, s in sold_rows}
 
     # 商品名稱
     prods = {p.id: p for p in db.query(Product).all()}
@@ -277,7 +282,7 @@ def _financial_report(db):
         .scalar()
     )
     orders_total = _to_float(
-        db.query(func.coalesce(func.sum(Order.total_amount), 0)).scalar()
+        active_orders(db.query(func.coalesce(func.sum(Order.total_amount), 0))).scalar()
     )
     sales_amount = sale_entries if sale_entries > 0 else orders_total
 
@@ -334,7 +339,7 @@ def _roi_report(db):
         .scalar()
     )
     recognized_orders_total = _to_float(
-        db.query(func.coalesce(func.sum(Order.total_amount), 0))
+        active_orders(db.query(func.coalesce(func.sum(Order.total_amount), 0)))
         .filter(
             (Order.payment_status == "paid")
             | (Order.shipping_status.in_(("shipped", "delivered")))
@@ -410,7 +415,7 @@ def index():
     fin = _financial_report(db)
     ranking = _sales_ranking(db)
     kpi = {
-        "order_count": db.query(func.count(Order.id)).scalar() or 0,
+        "order_count": active_orders(db.query(func.count(Order.id))).scalar() or 0,
         "customer_count": db.query(func.count(Customer.id)).scalar() or 0,
         "sales_amount": fin["sales_amount"],
         "net_profit": fin["net_profit"],
@@ -661,7 +666,7 @@ def _sheet_orders(wb, db, Font):
         "付款狀態", "出貨狀態", "備註", "建立時間",
     ], Font)
     cust = {c.id: c.name for c in db.query(Customer).all()}
-    for o in db.query(Order).order_by(Order.id).all():
+    for o in active_orders(db.query(Order)).order_by(Order.id).all():   # CR-4：作廢單不匯出
         total = _to_float(o.total_amount)
         fee = _to_float(o.shipping_fee)
         ws.append([

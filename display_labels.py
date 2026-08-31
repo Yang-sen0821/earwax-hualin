@@ -83,7 +83,11 @@ MTYPE_LABELS = {
     "ADJUSTMENT": "調整",
     "SEED": "期初",
     "IMPORT": "匯入",
+    "SALE_REVERSAL": "銷售回補",   # CR-4：訂單編輯/作廢回補
 }
+
+# 訂單作廢標籤（CR-4；列表灰字標示）
+VOIDED_LABEL = "已作廢"
 
 # users.role → 中文
 ROLE_LABELS = {
@@ -163,5 +167,6 @@ def register_display_helpers(app):
             "SHIPPING_LABELS": SHIPPING_LABELS,
             "MTYPE_LABELS": MTYPE_LABELS,
             "SHIPPING_METHOD_LABELS": SHIPPING_METHOD_LABELS,
+            "VOIDED_LABEL": VOIDED_LABEL,
             "ROLE_LABELS": ROLE_LABELS,
         }

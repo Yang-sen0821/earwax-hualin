@@ -3,7 +3,8 @@
 路由：
 - /m                     手機首頁（高頻入口）
 - /m/orders              訂單列表 + 付款/出貨狀態
-- /m/orders/<id>         單筆訂單明細 + 改狀態
+- /m/orders/<id>         單筆訂單明細 + 改狀態（狀態值閉集驗證）
+- /m/orders/<id>/void    作廢（CR-4；規則同桌面：未出貨 staff+owner 回補、已出貨 owner only 不回補）
 - /m/orders/new          快速建單（多品項，§4.2 整張 transaction）
 - /m/inventory           三池庫存摘要（boxed / loose_piece / paper_bag）
 - /m/shipments           待出貨列表 + 出貨（呼叫 deduct_for_shipment，§4.4）
@@ -26,7 +27,7 @@ from db import (
     get_session,
     Order, OrderItem, Customer, Product, SalesPlan,
     InventoryBalance, Shipment,
-    INVENTORY_POOLS, COMBO_CODES,
+    INVENTORY_POOLS, COMBO_CODES, active_orders,
 )
 import inventory_service
 from display_labels import combo_label
@@ -45,6 +46,10 @@ UNIT_CODES = ("LOOSE", "BOX")
 
 # 運送方式閉集（CR-5，與桌面 orders.SHIPPING_METHODS 同源）
 SHIPPING_METHODS = ("711", "post", "pickup", "other")
+
+# 手機改狀態閉集（CR-4：cancelled 移除，取消一律走作廢）
+MOBILE_PAYMENT_STATUSES = ("unpaid", "paid", "refunded", "partial")
+MOBILE_SHIPPING_STATUSES = ("pending", "shipped", "delivered")
 
 
 # -------------------------------------------------------------------------
@@ -66,7 +71,13 @@ def _gen_order_no(db):
             seq = int(last.order_no[len(prefix):]) + 1
         except (ValueError, TypeError):
             seq = 1
-    return f"{prefix}{seq:04d}"
+    candidate = f"{prefix}{seq:04d}"
+    # 防碰撞（2026-08-31 修）：桌面編號為 3 碼流水、手機為 4 碼，同日混用時字串排序會抓錯
+    # 「最後一筆」而算出已存在的號碼 → UNIQUE 炸掉、建單失敗。與桌面 _gen_order_no 同法往後找。
+    while db.query(Order.id).filter_by(order_no=candidate).first():
+        seq += 1
+        candidate = f"{prefix}{seq:04d}"
+    return candidate
 
 
 def _parse_money(raw):
@@ -114,7 +125,10 @@ def orders():
     db = get_session()
     pay = (request.args.get("pay") or "").strip()
     ship = (request.args.get("ship") or "").strip()
+    show_voided = request.args.get("voided") == "1"
     q = db.query(Order)
+    if not show_voided:
+        q = active_orders(q)   # CR-4：預設不列作廢單
     if pay:
         q = q.filter(Order.payment_status == pay)
     if ship:
@@ -122,7 +136,7 @@ def orders():
     rows = q.order_by(Order.created_at.desc()).limit(100).all()
     return render_template(
         "mobile/orders.html", section="mobile", user=current_user(),
-        orders=rows, pay=pay, ship=ship,
+        orders=rows, pay=pay, ship=ship, show_voided=show_voided,
     )
 
 
@@ -142,9 +156,19 @@ def order_detail(order_id):
         u_chk = current_user()
         if u_chk is None or (u_chk.role != "owner" and u_chk.role not in ORDER_WRITE_ROLES):
             abort(403)
+        if order.voided_at is not None:
+            flash("此訂單已作廢，不可再改狀態")
+            return redirect(url_for("mobile.order_detail", order_id=order_id))
         # 僅改狀態欄位；不動庫存（庫存變動走出貨/建單流程）
         new_pay = (request.form.get("payment_status") or "").strip()
         new_ship = (request.form.get("shipping_status") or "").strip()
+        # CR-4：狀態值閉集驗證（拒絕 cancelled 與任意字串）
+        if new_pay and new_pay not in MOBILE_PAYMENT_STATUSES:
+            flash("無效的付款狀態值，未更新")
+            return redirect(url_for("mobile.order_detail", order_id=order_id))
+        if new_ship and new_ship not in MOBILE_SHIPPING_STATUSES:
+            flash("無效的出貨狀態值，未更新（取消訂單請用「作廢」）")
+            return redirect(url_for("mobile.order_detail", order_id=order_id))
         changed = False
         if new_pay and new_pay != order.payment_status:
             order.payment_status = new_pay
@@ -173,11 +197,48 @@ def order_detail(order_id):
     customer = None
     if order.customer_id:
         customer = db.query(Customer).filter_by(id=order.customer_id).first()
+    from blueprints.orders import is_order_shipped
+    u_cur = current_user()
+    role = u_cur.role if u_cur else ""
+    shipped = is_order_shipped(db, order_id)
     return render_template(
         "mobile/order_detail.html", section="mobile", user=current_user(),
         order=order, items=items, prod_map=prod_map, customer=customer,
         combo_codes=COMBO_CODES,
+        is_shipped=shipped, is_voided=(order.voided_at is not None),
+        can_void=(role == "owner" or (role in ORDER_WRITE_ROLES and not shipped)),
     )
+
+
+# -------------------------------------------------------------------------
+# 作廢（CR-4；核心邏輯共用 blueprints.orders.perform_void）
+# -------------------------------------------------------------------------
+@mobile_bp.route("/orders/<int:order_id>/void", methods=["POST"])
+@role_required(*ORDER_WRITE_ROLES)
+def order_void(order_id):
+    from blueprints.orders import perform_void, is_order_shipped
+    db = get_session()
+    order = db.query(Order).filter_by(id=order_id).first()
+    if not order:
+        abort(404)
+    u = current_user()
+    if is_order_shipped(db, order_id) and (u is None or u.role != "owner"):
+        abort(403)   # 已出貨單作廢限 owner
+    operator = (u.display_name or u.username) if u else "system"
+    reason = (request.form.get("reason") or "").strip()
+    try:
+        ok, msg = perform_void(db, order, reason, operator, u.id if u else None, operator)
+        if not ok:
+            db.rollback()
+            flash(msg)
+            return redirect(url_for("mobile.order_detail", order_id=order_id))
+        db.commit()
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        flash(f"作廢失敗，已全數回復：{e}")
+        return redirect(url_for("mobile.order_detail", order_id=order_id))
+    flash(msg)
+    return redirect(url_for("mobile.order_detail", order_id=order_id))
 
 
 # -------------------------------------------------------------------------
@@ -397,9 +458,9 @@ def inventory():
 @login_required
 def shipments():
     db = get_session()
-    # 待出貨：尚未 shipped/delivered/cancelled
+    # 待出貨：尚未 shipped/delivered；作廢單不列（CR-4）
     rows = (
-        db.query(Order)
+        active_orders(db.query(Order))
         .filter(Order.shipping_status.in_(["pending"]))
         .order_by(Order.created_at.asc())
         .limit(100)
@@ -418,6 +479,9 @@ def ship_order(order_id):
     order = db.query(Order).filter_by(id=order_id).first()
     if not order:
         abort(404)
+    if order.voided_at is not None:
+        flash("此訂單已作廢，不可出貨")
+        return redirect(url_for("mobile.shipments"))
     if order.shipping_status != "pending":
         flash("此訂單非待出貨狀態，已略過")
         return redirect(url_for("mobile.shipments"))

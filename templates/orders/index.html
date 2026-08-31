@@ -29,6 +29,7 @@
       <option value="">出貨（全部）</option>
       {% for s in shipping_statuses %}<option value="{{ s }}" {{ 'selected' if f_ship==s }}>{{ s | shipping_label }}</option>{% endfor %}
     </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:14px;"><input type="checkbox" name="show_voided" value="1" {{ 'checked' if show_voided }}> 顯示{{ VOIDED_LABEL }}單</label>
     <button type="submit" style="padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">篩選</button>
   </form>
 
@@ -47,8 +48,9 @@
     </thead>
     <tbody>
       {% for o in orders %}
-      <tr style="border-bottom:1px solid var(--line);">
-        <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:var(--fc);text-decoration:none;font-weight:600;">{{ o.order_no }}</a></td>
+      {# CR-4：作廢單灰字＋「已作廢」標示（不隱藏於勾選檢視，但排除所有統計） #}
+      <tr style="border-bottom:1px solid var(--line);{% if o.voided_at %}color:#a09a91;text-decoration:line-through;{% endif %}">
+        <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:{{ '#a09a91' if o.voided_at else 'var(--fc)' }};text-decoration:none;font-weight:600;">{{ o.order_no }}</a>{% if o.voided_at %} <span style="font-size:12px;color:#a33;text-decoration:none;display:inline-block;">{{ VOIDED_LABEL }}</span>{% endif %}</td>
         <td style="padding:8px;">
           {% if o.customer_id and cust_map.get(o.customer_id) %}{{ cust_map[o.customer_id].name }}{% else %}{{ o.recipient_name or '—' }}{% endif %}
         </td>

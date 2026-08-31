@@ -54,6 +54,8 @@ MOVEMENT_TYPES = (
     "SCRAP_LOSS", "SCRAP",
     # 系統內部 6 類
     "SPLIT_BOX", "RELEASE_RESERVE", "PAPERBAG_OUT", "ADJUSTMENT", "SEED", "IMPORT",
+    # CR-4（2026-08-31）：訂單編輯/作廢的銷售回補（SALE 反向），線上 CHECK 需重建 +此值
+    "SALE_REVERSAL",
 )
 
 INVENTORY_POOLS = ("boxed", "loose_piece", "paper_bag")
@@ -203,10 +205,22 @@ class Order(Base):
     payment_status = Column(String(20), nullable=False, default="unpaid")   # D4：unpaid/paid/refunded...
     shipping_status = Column(String(20), nullable=False, default="pending")  # D4：pending/shipped/delivered/cancelled
     note = Column(Text)
+    # ---- CR-4（2026-08-31）：作廢＝軟刪除（不刪 order_items / payments / shipments，FK 與 movement ref 不斷）----
+    voided_at = Column(DateTime)                                   # NULL＝有效單
+    voided_by = Column(Integer, ForeignKey(_fk("users.id")))
+    void_reason = Column(String(256))
     created_by = Column(Integer, ForeignKey(_fk("users.id")))
     updated_by = Column(Integer, ForeignKey(_fk("users.id")))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+def active_orders(query):
+    """所有「列出／統計訂單」的查詢統一經此排除作廢單（CR-4）。
+
+    用法：active_orders(db.query(Order)).filter(...)；join 查詢亦可傳入含 Order 的 query。
+    """
+    return query.filter(Order.voided_at.is_(None))
 
 
 # =========================================================================

@@ -4,6 +4,13 @@
 {% block back %}<a href="/m/orders" class="back">‹</a>{% endblock %}
 {% set active_tab = 'orders' %}
 {% block content %}
+  {% if is_voided %}
+  <div class="card" style="background:#f3f1ee;color:#6b6259;">
+    <div class="ttl2" style="color:#a33;">{{ VOIDED_LABEL }}</div>
+    <div class="sub">{{ order.voided_at.strftime('%Y-%m-%d %H:%M') if order.voided_at else '' }}{% if order.void_reason %}　原因：{{ order.void_reason }}{% endif %}</div>
+    <div class="sub">此單不計入統計；狀態已鎖定。</div>
+  </div>
+  {% endif %}
   <div class="card">
     <h3>收件資訊</h3>
     <div class="row"><div class="grow"><div class="sub">收件人</div>
@@ -46,6 +53,7 @@
       <div class="big">${{ '%.0f'|format((order.total_amount or 0) + (order.shipping_fee or 0)) }}</div></div>
   </div>
 
+  {% if not is_voided %}
   <div class="card">
     <h3>狀態</h3>
     <form method="post" action="/m/orders/{{ order.id }}">
@@ -56,15 +64,35 @@
         <option value="refunded" {{ 'selected' if order.payment_status=='refunded' }}>已退款</option>
       </select>
       <label>出貨狀態</label>
+      {# CR-4：移除「已取消」選項，取消一律走下方作廢（會回補庫存） #}
       <select name="shipping_status">
         <option value="pending" {{ 'selected' if order.shipping_status=='pending' }}>待出貨</option>
         <option value="shipped" {{ 'selected' if order.shipping_status=='shipped' }}>已出貨</option>
         <option value="delivered" {{ 'selected' if order.shipping_status=='delivered' }}>已送達</option>
-        <option value="cancelled" {{ 'selected' if order.shipping_status=='cancelled' }}>已取消</option>
       </select>
       <div class="hint">出貨扣紙袋請走「出貨」頁，此處僅改狀態旗標。</div>
       <div style="height:10px"></div>
       <button class="btn btn-primary" type="submit">儲存狀態</button>
     </form>
   </div>
+
+  {% if can_void %}
+  <div class="card" style="border:1px solid #f0caca;">
+    <h3 style="color:var(--warn);">作廢訂單</h3>
+    <div class="hint" style="margin-top:0;">
+      {% if is_shipped %}已出貨單：作廢後不回補庫存、不計入統計；已付款改為已退款。
+      {% else %}作廢後品項庫存全額回補、不計入統計；已付款改為已退款。明細與紀錄保留。{% endif %}
+    </div>
+    <form method="post" action="/m/orders/{{ order.id }}/void"
+          onsubmit="return confirm('確定作廢 {{ order.order_no }}？此動作不可復原。')">
+      <label>作廢原因（必填）</label>
+      <input type="text" name="reason" required maxlength="256" autocomplete="off">
+      <div style="height:10px"></div>
+      <button class="btn" type="submit" style="background:var(--warn);color:#fff;">作廢此單</button>
+    </form>
+  </div>
+  {% elif is_shipped %}
+  <div class="hint">此單已出貨，作廢需由老闆（owner）操作。</div>
+  {% endif %}
+  {% endif %}
 {% endblock %}

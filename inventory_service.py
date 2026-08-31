@@ -511,6 +511,74 @@ def release_reserved(session, product_id, qty, operator,
 
 
 # =========================================================================
+# CR-4（2026-08-31）訂單銷售回補：SALE 反向 +qty，型別 SALE_REVERSAL
+# =========================================================================
+def reverse_sale(session, order_id, operator, actor_id=None, reason=""):
+    """整單銷售回補（訂單編輯前的反沖 / 未出貨作廢）。
+
+    以該單 ref_type='order' AND ref_id=str(order_id) 的 SALE 與 SALE_REVERSAL movement 為準，
+    逐 (product_id, pool, category) 計淨額（SALE 為負、REVERSAL 為正）：
+    - 全部淨額為 0 ⇒ 已回補過，回 ok=False「已回補過」拒絕重複（冪等，Codex M1）。
+    - 完全沒有 SALE 紀錄 ⇒ 無事可做，回 ok=True、movement_ids=[]（歷史直建單相容）。
+    - 否則對每個淨額 <0 的鍵 _apply_delta(+|淨額|, SALE_REVERSAL)，同一新 movement_group_id，
+      note 記原 SALE movement_id 清單，reason 由呼叫端標明 order_edit / order_void。
+    R1：唯一經 _apply_delta，同 tx 寫 movement；session 由呼叫端 commit/rollback。
+    寫法範本：release_reserved(mode='cancel')。
+    """
+    if not operator:
+        return Result(ok=False, error="operator 不可空")
+    ref_id = str(order_id)
+    mvs = (
+        session.query(InventoryMovement)
+        .filter(
+            InventoryMovement.ref_type == "order",
+            InventoryMovement.ref_id == ref_id,
+            InventoryMovement.movement_type.in_(("SALE", "SALE_REVERSAL")),
+        )
+        .order_by(InventoryMovement.movement_id.asc())
+        .all()
+    )
+    if not mvs:
+        return Result(ok=True, movement_ids=[])
+
+    net = {}          # (pid, pool, cat) -> 淨額
+    src_ids = {}      # (pid, pool, cat) -> 原 SALE movement_id 清單
+    for m in mvs:
+        if m.movement_type == "SALE":
+            cat = m.stock_category_from or "normal"
+        else:
+            cat = m.stock_category_to or "normal"
+        key = (m.product_id, m.inventory_pool, cat)
+        net[key] = net.get(key, 0) + int(m.qty_delta or 0)
+        if m.movement_type == "SALE":
+            src_ids.setdefault(key, []).append(m.movement_id)
+
+    todo = [(k, v) for k, v in net.items() if v < 0]
+    if not todo:
+        return Result(ok=False, error="已回補過（該單 SALE 已全數對沖，拒絕重複回補）")
+
+    group_id = _new_group_id()
+    mv_ids = []
+    try:
+        for (pid, pool, cat), v in todo:
+            qb, qa, mv_id = _apply_delta(
+                session, pid, pool, cat, +abs(v),
+                movement_type="SALE_REVERSAL", operator=operator,
+                stock_category_from=None, stock_category_to=cat,
+                ref_type="order", ref_id=ref_id, movement_group_id=group_id,
+                reason=(reason or "reverse_sale"),
+                note=f"回補訂單 {ref_id}；原 SALE movement_id: {src_ids.get((pid, pool, cat), [])}",
+                created_by=actor_id,
+                allow_create_on_increase=True,
+            )
+            mv_ids.append(mv_id)
+    except InventoryError as e:
+        return Result(ok=False, error=str(e), movement_ids=mv_ids)
+
+    return Result(ok=True, movement_ids=mv_ids)
+
+
+# =========================================================================
 # §7.9 手動調整 / 盤點（ADJUSTMENT + reason 必填 + owner 核可）
 # =========================================================================
 def adjust_inventory(session, product_id, inventory_pool, stock_category,
