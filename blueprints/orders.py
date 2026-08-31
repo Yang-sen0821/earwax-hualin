@@ -12,6 +12,8 @@
   → 重算 total）與作廢（軟刪除 voided_at/by/reason；未出貨全額回補、已出貨不回補限 owner）；
   兩者皆寫 audit_logs。「已出貨」判定＝shipments 有該單列（或 shipping_status 已為 shipped/delivered，
   相容本修正前由桌面出貨、未建 shipments 列的歷史單）。
+- CR-7（2026-08-31）：GET /orders/new?customer_id=<id> 預填客戶（客戶明細頁「＋ 新增訂單」入口）；
+  id 不存在則忽略、照常開空白建單頁；仍可換人（沿用客戶欄打字過濾）。
 - CR-6（2026-08-31）：桌面列表勾選批次作廢（POST /orders/void-bulk）；規則完全沿用 perform_void，
   一個原因套用全批、整批同一 tx（任一失敗全數 rollback）、已作廢單跳過、staff 勾到已出貨單整批拒絕；
   每筆各寫一筆 AuditLog(order_void)，detail 另註 bulk=True / bulk_group_id（同批同一 uuid）。
@@ -146,8 +148,24 @@ def new():
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
         products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
         unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
-        form={},
+        form=_prefill_customer_form(db, request.args.get("customer_id")),
     )
+
+
+def customer_display(cust):
+    """客戶欄顯示字串（與 form.html JS label() 同格式：姓名（電話） / 姓名）。"""
+    if not cust:
+        return ""
+    return f"{cust.name}（{cust.phone}）" if cust.phone else cust.name
+
+
+def _prefill_customer_form(db, customer_id_raw):
+    """CR-7：?customer_id= 預填客戶欄；無 / 不存在 ⇒ 空 form。"""
+    cid = _to_int(customer_id_raw)
+    cust = db.get(Customer, cid) if cid else None
+    if not cust:
+        return {}
+    return {"customer_id": str(cust.id), "customer_display": customer_display(cust)}
 
 
 def _parse_shipping_fields():
@@ -838,12 +856,9 @@ def _resolve_customer(db, customer_id, new_customer_name, recipient_phone):
 def _edit_form_dict(db, order):
     """GET 編輯頁：以訂單現值預填 form.html。"""
     cust = db.get(Customer, order.customer_id) if order.customer_id else None
-    disp = ""
-    if cust:
-        disp = f"{cust.name}（{cust.phone}）" if cust.phone else cust.name
     return {
         "customer_id": str(order.customer_id or ""),
-        "customer_display": disp,
+        "customer_display": customer_display(cust),
         "recipient_name": order.recipient_name or "",
         "recipient_phone": order.recipient_phone or "",
         "shipping_address": order.shipping_address or "",

@@ -382,10 +382,12 @@ def order_new():
             flash(f"建單失敗，已全數回復：{e}")
             return _render_order_new(db)
 
-    return _render_order_new(db)
+    # CR-7：?customer_id= 預填客戶（客戶明細頁「＋ 新增訂單」入口）；不存在則忽略
+    from blueprints.orders import _prefill_customer_form
+    return _render_order_new(db, form=_prefill_customer_form(db, request.args.get("customer_id")))
 
 
-def _render_order_new(db):
+def _render_order_new(db, form=None):
     customers = db.query(Customer).order_by(Customer.name).all()
     # 可下單品項：非包材、上架
     products = (
@@ -398,6 +400,7 @@ def _render_order_new(db):
         "mobile/order_new.html", section="mobile", user=current_user(),
         customers=customers, products=products,
         unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
+        form=form or {},
     )
 
 

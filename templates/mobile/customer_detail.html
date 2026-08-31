@@ -17,6 +17,12 @@
     {% endif %}
   </div>
 
+  {# CR-7：從客戶頁直接建單（預填此客戶）；權限比照建單 staff/owner #}
+  {% if user and user.role in ('owner', 'staff') %}
+  <a href="/m/orders/new?customer_id={{ customer.id }}" class="btn btn-primary"
+     style="text-decoration:none;margin-bottom:10px;">＋ 新增訂單</a>
+  {% endif %}
+
   <div class="card">
     <h3>交易小計</h3>
     <div class="row"><div class="grow ttl2">訂單數</div><div class="big">{{ summary.order_count }}</div></div>

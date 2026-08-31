@@ -11,6 +11,11 @@
 <div class="card">
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <h2 style="margin:0;flex:1;">{{ customer.name }}</h2>
+    {# CR-7：從客戶頁直接建單（預填此客戶）；權限比照建單 staff/owner（session role，與 base.html 導覽同手法） #}
+    {% if session.get('role') in ('owner', 'staff') %}
+    <a href="{{ url_for('orders.new', customer_id=customer.id) }}"
+       style="padding:8px 14px;background:var(--fc);color:#fff;border-radius:8px;text-decoration:none;">＋ 新增訂單</a>
+    {% endif %}
     <a href="{{ url_for('customers.edit', customer_id=customer.id) }}"
        style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">編輯</a>
     <form method="post" action="{{ url_for('customers.delete', customer_id=customer.id) }}"

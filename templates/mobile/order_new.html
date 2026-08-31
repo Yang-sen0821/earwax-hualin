@@ -8,13 +8,15 @@
   <form method="post" action="/m/orders/new">
     <div class="card">
       <h3>收件資訊</h3>
-      {# 客戶欄：打字過濾（森哥 2026-08-19），與桌面同行為。原為純下拉。 #}
+      {# 客戶欄：打字過濾（森哥 2026-08-19），與桌面同行為。原為純下拉。
+         CR-7：由客戶明細頁進來時 form 帶 customer_id / customer_display 預填，仍可改字換人。 #}
       <label>客戶（選填）</label>
       <div style="position:relative;">
         <input type="text" id="cust-input" autocomplete="off"
-               placeholder="打字搜尋姓名或電話；留空＝不綁定">
-        <input type="hidden" name="customer_id" id="cust-id">
-        <input type="hidden" name="new_customer_name" id="cust-new">
+               placeholder="打字搜尋姓名或電話；留空＝不綁定"
+               value="{{ form.get('customer_display', '') }}">
+        <input type="hidden" name="customer_id" id="cust-id" value="{{ form.get('customer_id', '') }}">
+        <input type="hidden" name="new_customer_name" id="cust-new" value="{{ form.get('new_customer_name', '') }}">
         <div id="cust-list"
              style="display:none;position:absolute;z-index:30;left:0;right:0;background:#fff;
                     border:1px solid #e5e0d8;border-radius:8px;margin-top:2px;max-height:220px;
