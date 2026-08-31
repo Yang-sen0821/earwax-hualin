@@ -15,7 +15,6 @@
 鐵律：任何改庫存量一律呼叫 inventory_service 的契約函式；本檔禁止自寫
 inventory_balances / inventory_movements。session commit/rollback 在本層管理（同一 tx）。
 """
-import json
 import os
 from datetime import datetime
 
@@ -28,12 +27,13 @@ from auth import login_required, role_required, current_user
 from config import Config
 from db import (
     get_session, Product, InventoryBalance, InventoryMovement,
-    InventoryThreshold, AuditLog,
+    InventoryThreshold,
     INVENTORY_POOLS, STOCK_CATEGORIES, MOVEMENT_TYPES,
 )
 import inventory_service as inv
 # 顯示用標籤：全站單一來源（display_labels）
 from display_labels import POOL_LABELS, CAT_LABELS, MTYPE_LABELS
+from audit_util import write_audit
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
@@ -144,13 +144,22 @@ def _earwax_form_values():
 
 
 def _audit(db, action, target_id, detail_obj, target_type="earwax.consumables"):
-    u = current_user()
-    db.add(AuditLog(
-        actor_id=(u.id if u else None), actor_name=_operator_name(),
-        action=action, target_type=target_type,
-        target_id=str(target_id),
-        detail=json.dumps(detail_obj, ensure_ascii=False, default=str),
-    ))
+    """留痕（CR-8 起走共用 audit_util.write_audit；actor 取 session 使用者）。"""
+    write_audit(db, action, target_type, target_id, detail_obj)
+
+
+def _inv_audit(db, action, product_id, res, pool=None, category=None, **extra):
+    """庫存量異動留痕（CR-8）：商品 / 池 / 分類 / 前後量 / movement ids；extra 併入（movement_type、reason…）。"""
+    p = db.get(Product, product_id)
+    detail = {
+        "product_id": product_id, "product_name": (p.name if p else None),
+        "pool": pool, "category": category,
+        "qty_before": getattr(res, "qty_before", None),
+        "qty_after": getattr(res, "qty_after", None),
+        "movement_ids": list(getattr(res, "movement_ids", []) or []),
+    }
+    detail.update(extra)
+    write_audit(db, action, "inventory", product_id, detail)
 
 
 @inventory_bp.route("/earwax/<int:cid>/edit", methods=["POST"])
@@ -272,6 +281,7 @@ def quick_edit(pid):
             if res.movement_ids:
                 changed.append(f"{POOL_LABELS.get(pool, pool)}／{CAT_LABELS.get(cat, cat)} "
                                f"{res.qty_before} → {res.qty_after}")
+                _inv_audit(db, "inventory_quick_adjust", product.id, res, pool, cat)   # CR-8
         db.commit()
     except Exception:
         db.rollback()
@@ -307,6 +317,8 @@ def restock():
         res = inv.restock(db, product_id, pool, category, mtype, qty,
                           _operator_name(), note=note)
         if res.ok:
+            _inv_audit(db, "inventory_restock", product_id, res, pool, category,
+                       movement_type=mtype, qty=qty, note=note)   # CR-8
             db.commit()
             flash(f"入庫成功：{POOL_LABELS.get(pool, pool)} +{qty}，現存 {res.qty_after}", "ok")
             return redirect(url_for("inventory.index"))
@@ -344,6 +356,8 @@ def deduct():
         res = inv.deduct_out(db, product_id, pool, category, mtype, qty,
                              _operator_name(), note=note)
         if res.ok:
+            _inv_audit(db, "inventory_deduct", product_id, res, pool, category,
+                       movement_type=mtype, qty=-qty, note=note)   # CR-8
             db.commit()
             # §7.10 扣減後查低水位
             lw = inv.check_low_water(db, product_id, pool, category)
@@ -384,6 +398,8 @@ def split():
         note = request.form.get("note", "")
         res = inv.split_box(db, product_id, box_qty, _operator_name(), note=note)
         if res.ok:
+            _inv_audit(db, "inventory_split_box", product_id, res, "boxed", "normal",
+                       box_qty=box_qty, pieces=box_qty * 5, note=note)   # CR-8
             db.commit()
             lw = inv.check_low_water(db, product_id, "boxed", "normal")
             msg = (f"拆盒成功：盒 -{box_qty}、片 +{box_qty*5}；"
@@ -435,6 +451,9 @@ def adjust():
             _operator_name(), approved_by=approver.id, note=note,
         )
         if res.ok:
+            _inv_audit(db, "inventory_adjust", product_id, res, pool, category,
+                       target_qty=target_qty, reason=reason, note=note,
+                       approved_by=approver.id)   # CR-8
             db.commit()
             flash(f"調整成功：{POOL_LABELS.get(pool, pool)}/{CAT_LABELS.get(category, category)} "
                   f"{res.qty_before} → {res.qty_after}", "ok")

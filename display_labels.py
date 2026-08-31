@@ -89,6 +89,64 @@ MTYPE_LABELS = {
 # 訂單作廢標籤（CR-4；列表灰字標示）
 VOIDED_LABEL = "已作廢"
 
+# audit_logs.action → 中文（CR-8 操作紀錄；查不到原字顯示）
+ACTION_LABELS = {
+    # 訂單
+    "order_create": "建立訂單",
+    "order_edit": "編輯訂單",
+    "order_void": "作廢訂單",
+    "order_payment_status": "改付款狀態",
+    "order_shipping_status": "改出貨狀態",
+    # 庫存
+    "inventory_quick_adjust": "庫存頁直改數量",
+    "inventory_restock": "補貨入庫",
+    "inventory_deduct": "通用出庫",
+    "inventory_split_box": "拆盒調撥",
+    "inventory_adjust": "手動調整庫存",
+    "product_name_edit": "庫存頁改品名",
+    # 商品 / 規格 / 門檻 / 設定
+    "product_create": "新增商品",
+    "product_update": "編輯商品",
+    "product_spec_create": "新增規格",
+    "product_spec_delete": "刪除規格",
+    "threshold_update": "設定低水位門檻",
+    "setting_update": "變更設定",
+    # 客戶 / 地址
+    "customer_create": "新增客戶",
+    "customer_update": "編輯客戶",
+    "customer_delete": "刪除客戶",
+    "customer_address_create": "新增客戶地址",
+    "customer_address_update": "編輯客戶地址",
+    "customer_address_delete": "刪除客戶地址",
+    # 支出
+    "expense_create": "新增支出",
+    "expense_update": "編輯支出",
+    "expense_delete": "刪除支出",
+    # 愛啪啪
+    "earwax_sale_create": "愛啪啪銷售",
+    "earwax_consumable_edit": "編輯愛啪啪耗材",
+    "earwax_consumable_create": "新增愛啪啪耗材",
+    # 登入
+    "login_ok": "登入成功",
+    "login_fail": "登入失敗",
+}
+
+# audit_logs.target_type → 中文
+TARGET_TYPE_LABELS = {
+    "orders": "訂單",
+    "products": "商品",
+    "product_specs": "商品規格",
+    "inventory_thresholds": "低水位門檻",
+    "inventory": "庫存",
+    "settings": "設定",
+    "customers": "客戶",
+    "customer_addresses": "客戶地址",
+    "extra_expenses": "支出",
+    "earwax_sales": "愛啪啪銷售",
+    "earwax.consumables": "愛啪啪耗材",
+    "users": "帳號",
+}
+
 # users.role → 中文
 ROLE_LABELS = {
     "owner": "老闆",
@@ -138,6 +196,14 @@ def role_label(code):
     return _lookup(ROLE_LABELS, code)
 
 
+def action_label(code):
+    return _lookup(ACTION_LABELS, code)
+
+
+def target_type_label(code):
+    return _lookup(TARGET_TYPE_LABELS, code)
+
+
 def register_display_helpers(app):
     """全站註冊：Jinja filter（顯示用）+ context_processor（下拉用對照表）。
 
@@ -155,6 +221,8 @@ def register_display_helpers(app):
     app.add_template_filter(mtype_label, "mtype_label")
     app.add_template_filter(shipping_method_label, "shipping_method_label")
     app.add_template_filter(role_label, "role_label")
+    app.add_template_filter(action_label, "action_label")
+    app.add_template_filter(target_type_label, "target_type_label")
 
     @app.context_processor
     def _inject_label_maps():
@@ -169,4 +237,6 @@ def register_display_helpers(app):
             "SHIPPING_METHOD_LABELS": SHIPPING_METHOD_LABELS,
             "VOIDED_LABEL": VOIDED_LABEL,
             "ROLE_LABELS": ROLE_LABELS,
+            "ACTION_LABELS": ACTION_LABELS,
+            "TARGET_TYPE_LABELS": TARGET_TYPE_LABELS,
         }

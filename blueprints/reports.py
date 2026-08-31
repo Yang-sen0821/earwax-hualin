@@ -28,10 +28,14 @@ from db import (
 )
 from display_labels import (
     combo_label, pool_label, payment_label, shipping_label, mtype_label,
-    shipping_method_label,
+    shipping_method_label, action_label, target_type_label,
 )
+from audit_util import write_audit, snapshot, diff, summarize
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
+
+# CR-8 支出留痕欄位
+EXPENSE_FIELDS = ("name", "amount", "category", "expense_date", "note")
 
 # =========================================================================
 # 支出管理：唯一成本來源 = extra_expenses by category
@@ -644,12 +648,16 @@ def expense_add():
     if not dok:
         flash(f"支出新增失敗：{derr}", "error")
         return redirect(url_for("reports.expenses"))
-    db.add(ExtraExpense(
+    e = ExtraExpense(
         name=name, amount=val, category=category,
         expense_date=dt or datetime.utcnow(),
         note=request.form.get("note", "").strip() or None,
         created_by=_uid(),
-    ))
+    )
+    db.add(e)
+    db.flush()
+    write_audit(db, "expense_create", "extra_expenses", e.id,
+                {"after": snapshot(e, EXPENSE_FIELDS)})   # CR-8
     db.commit()
     flash(f"支出「{name}」已新增（{category} {val:.2f}）", "ok")
     return redirect(url_for("reports.expenses"))
@@ -678,12 +686,17 @@ def expense_update(eid):
     if not dok:
         flash(f"支出更新失敗：{derr}", "error")
         return redirect(url_for("reports.expenses"))
+    before = snapshot(e, EXPENSE_FIELDS)
     e.name = name
     e.amount = val
     e.category = category
     if dt is not None:
         e.expense_date = dt
     e.note = request.form.get("note", "").strip() or None
+    b, a = diff(before, snapshot(e, EXPENSE_FIELDS))
+    if a:   # CR-8：只寫有變的欄
+        write_audit(db, "expense_update", "extra_expenses", e.id,
+                    {"name": e.name, "before": b, "after": a})
     db.commit()
     flash(f"支出「{name}」已更新（{category} {val:.2f}）", "ok")
     return redirect(url_for("reports.expenses"))
@@ -697,6 +710,8 @@ def expense_delete(eid):
     if not e:
         abort(404)
     nm = e.name
+    write_audit(db, "expense_delete", "extra_expenses", e.id,
+                {"before": snapshot(e, EXPENSE_FIELDS)})   # CR-8
     db.delete(e)
     db.commit()
     flash(f"支出「{nm}」已刪除", "ok")

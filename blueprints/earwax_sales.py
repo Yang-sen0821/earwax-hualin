@@ -8,7 +8,6 @@
 權限：寫＝owner/staff/warehouse；讀（清單）＝owner/accounting/staff/warehouse（viewer 不可）。
 品項僅限 consumable（消耗品）；equipment（儀器）不可售。
 """
-import json
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, abort,
@@ -17,7 +16,8 @@ from sqlalchemy import text
 
 from auth import login_required, role_required, current_user
 from blueprints.inventory import EARWAX_TABLE, _earwax_enabled
-from db import get_session, EarwaxSale, AuditLog
+from db import get_session, EarwaxSale
+from audit_util import write_audit
 
 earwax_sales_bp = Blueprint("earwax_sales", __name__, url_prefix="/earwax-sales")
 
@@ -67,15 +67,12 @@ def create_sale(db, item_id, qty, amount, note, operator, created_by):
                       created_by=created_by)
     db.add(sale)
     u = current_user()
-    db.add(AuditLog(
-        actor_id=(u.id if u else None), actor_name=operator,
-        action="earwax_sale_create", target_type="earwax_sales",
-        target_id=str(item_id),
-        detail=json.dumps({"item": row["name"], "qty": qty, "amount": amount,
-                           "qty_before": row["qty_on_hand"],
-                           "qty_after": row["qty_on_hand"] - qty,
-                           "note": note or ""}, ensure_ascii=False),
-    ))
+    write_audit(db, "earwax_sale_create", "earwax_sales", item_id,
+                {"item": row["name"], "qty": qty, "amount": amount,
+                 "qty_before": row["qty_on_hand"],
+                 "qty_after": row["qty_on_hand"] - qty,
+                 "note": note or ""},
+                actor_id=(u.id if u else None), actor_name=operator)   # CR-8：走共用寫入口
     return True, f"已記錄：{row['name']} × {qty}"
 
 

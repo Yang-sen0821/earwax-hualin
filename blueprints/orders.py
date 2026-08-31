@@ -42,12 +42,13 @@ from auth import login_required, role_required, current_user
 from db import (
     get_session, COMBO_CODES,
     Order, OrderItem, Customer, CustomerAddress,
-    Product, SalesPlan, Shipment, AuditLog,
+    Product, SalesPlan, Shipment,
     HistoricalOrderImport, HistoricalOrderImportRow,
     active_orders,
 )
 import inventory_service
 from display_labels import combo_label
+from audit_util import write_audit
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/orders")
 
@@ -289,6 +290,9 @@ def _create_order(db):
                 flash(f"庫存不足，整張訂單未建立：{pname} / {combo_label(r['combo_code'])} × {r['qty']}")
                 return _redraw_form(db)
 
+        # CR-8：建單留痕（同一 tx；整張 rollback 時一併消失）
+        _audit(db, "order_create", order.id,
+               _order_create_detail(db, order, rows, created_customer))
         db.commit()
     except Exception as exc:  # noqa: BLE001 — 任何異動失敗整張 rollback（R1）
         db.rollback()
@@ -319,8 +323,15 @@ def update_payment(order_id):
     if new_status not in PAYMENT_STATUSES:
         flash("無效的付款狀態")
         return redirect(url_for("orders.detail", order_id=order_id))
+    old_status = order.payment_status
     order.payment_status = new_status
     order.updated_by = _uid()
+    if old_status != new_status:   # CR-8：付款狀態變更留痕（before → after）
+        _audit(db, "order_payment_status", order.id, {
+            "order_no": order.order_no,
+            "before": {"payment_status": old_status},
+            "after": {"payment_status": new_status},
+        })
     db.commit()
     flash("付款狀態已更新")
     return redirect(url_for("orders.detail", order_id=order_id))
@@ -375,6 +386,15 @@ def update_shipping(order_id):
                 created_by=_uid(),
             ))
 
+        if old_status != new_status:   # CR-8：出貨狀態變更留痕（before → after）
+            _audit(db, "order_shipping_status", order.id, {
+                "order_no": order.order_no,
+                "before": {"shipping_status": old_status},
+                "after": {"shipping_status": new_status},
+                "paper_bag_deducted": triggers_shipment,
+                "tracking_no": (request.form.get("tracking_no") or "").strip() or None,
+                "carrier": (request.form.get("carrier") or "").strip() or None,
+            })
         db.commit()
     except Exception as exc:  # noqa: BLE001
         db.rollback()
@@ -828,15 +848,29 @@ def _order_snapshot(db, order):
 
 
 def _audit(db, action, order_id, detail):
-    u = current_user()
-    db.add(AuditLog(
-        actor_id=(u.id if u else None),
-        actor_name=_operator_name(),
-        action=action,
-        target_type="orders",
-        target_id=str(order_id),
-        detail=json.dumps(detail, ensure_ascii=False, default=_json_default),
-    ))
+    """訂單類留痕（CR-8 起走共用 audit_util.write_audit；actor 取 session 使用者）。"""
+    write_audit(db, action, "orders", order_id, detail)
+
+
+def _order_create_detail(db, order, rows, created_customer=None):
+    """建單留痕 detail：單號 / 客戶 / 品項摘要 / 金額（CR-8）。rows 為 (product_id, combo_code, qty, unit_price, subtotal) dict。"""
+    cust_name = None
+    if order.customer_id:
+        c = db.get(Customer, order.customer_id)
+        cust_name = c.name if c else None
+    return {
+        "order_no": order.order_no,
+        "customer_id": order.customer_id, "customer_name": cust_name,
+        "recipient_name": order.recipient_name, "recipient_phone": order.recipient_phone,
+        "items": [{
+            "product_id": r["product_id"], "product_name": _product_label(db, r["product_id"]),
+            "combo_code": r["combo_code"], "qty": r["qty"],
+            "unit_price": r.get("unit_price"), "subtotal": r.get("subtotal"),
+        } for r in rows],
+        "total_amount": order.total_amount, "discount": order.discount,
+        "shipping_fee": order.shipping_fee, "shipping_method": order.shipping_method,
+        "created_customer": created_customer,
+    }
 
 
 def _resolve_customer(db, customer_id, new_customer_name, recipient_phone):
@@ -1047,11 +1081,8 @@ def perform_void(db, order, reason, operator, actor_id, actor_name, extra_detail
     }
     if extra_detail:
         detail.update(extra_detail)
-    db.add(AuditLog(
-        actor_id=actor_id, actor_name=actor_name, action="order_void",
-        target_type="orders", target_id=str(order.id),
-        detail=json.dumps(detail, ensure_ascii=False, default=_json_default),
-    ))
+    write_audit(db, "order_void", "orders", order.id, detail,
+                actor_id=actor_id, actor_name=actor_name)
     msg = f"訂單 {order.order_no} 已作廢" + (
         "（已出貨單：庫存不回補）" if shipped else "（庫存已回補）")
     if old_pay == "paid":

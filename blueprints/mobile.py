@@ -32,6 +32,7 @@ from db import (
 )
 import inventory_service
 from display_labels import combo_label
+from audit_util import write_audit
 
 mobile_bp = Blueprint("mobile", __name__, url_prefix="/m")
 
@@ -172,9 +173,21 @@ def order_detail(order_id):
             return redirect(url_for("mobile.order_detail", order_id=order_id))
         changed = False
         if new_pay and new_pay != order.payment_status:
+            # CR-8：付款狀態變更留痕（與桌面 update_payment 同 action / 同 detail 結構）
+            write_audit(db, "order_payment_status", "orders", order.id, {
+                "order_no": order.order_no,
+                "before": {"payment_status": order.payment_status},
+                "after": {"payment_status": new_pay}, "via": "mobile",
+            })
             order.payment_status = new_pay
             changed = True
         if new_ship and new_ship != order.shipping_status:
+            write_audit(db, "order_shipping_status", "orders", order.id, {
+                "order_no": order.order_no,
+                "before": {"shipping_status": order.shipping_status},
+                "after": {"shipping_status": new_ship},
+                "paper_bag_deducted": False, "via": "mobile",
+            })
             order.shipping_status = new_ship
             changed = True
         if changed:
@@ -370,6 +383,15 @@ def order_new():
                 ))
 
             order.total_amount = total
+            # CR-8：建單留痕（同一 tx；與桌面 order_create 同 detail 結構）
+            from blueprints.orders import _order_create_detail
+            detail = _order_create_detail(db, order, [
+                {"product_id": pid, "combo_code": combo, "qty": qty,
+                 "unit_price": amount, "subtotal": amount}
+                for pid, combo, qty, amount in line_items
+            ], created_customer)
+            detail["via"] = "mobile"
+            write_audit(db, "order_create", "orders", order.id, detail)
             db.commit()
             if created_customer:
                 flash(f"訂單已建立：{order.order_no}；同時新增客戶「{created_customer}」")
@@ -517,6 +539,15 @@ def ship_order(order_id):
             created_by=u.id if u else None,
         )
         db.add(shipment)
+        # CR-8：出貨留痕（與桌面 update_shipping 同 action / 同 detail 結構）
+        write_audit(db, "order_shipping_status", "orders", order.id, {
+            "order_no": order.order_no,
+            "before": {"shipping_status": order.shipping_status},
+            "after": {"shipping_status": "shipped"},
+            "paper_bag_deducted": True,
+            "tracking_no": tracking_no or None, "carrier": carrier or None,
+            "via": "mobile",
+        })
         order.shipping_status = "shipped"
         order.updated_by = u.id if u else None
         db.commit()
@@ -593,6 +624,11 @@ def customer_new():
             updated_by=u.id if u else None,
         )
         db.add(c)
+        db.flush()
+        write_audit(db, "customer_create", "customers", c.id, {   # CR-8
+            "after": {"name": c.name, "phone": c.phone, "email": c.email, "note": c.note},
+            "via": "mobile",
+        })
         db.commit()
         flash(f"客戶已建立：{c.name}")
         return redirect(url_for("mobile.customers"))

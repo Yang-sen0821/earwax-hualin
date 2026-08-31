@@ -28,8 +28,13 @@ from db import (
     InventoryThreshold, Setting,
     INVENTORY_POOLS, COMBO_CODES,
 )
+from audit_util import write_audit, snapshot, diff
 
 products_bp = Blueprint("products", __name__, url_prefix="/products")
+
+# CR-8 留痕欄位
+PRODUCT_FIELDS = ("sku", "name", "category", "image_url", "description", "active", "is_packaging")
+SPEC_FIELDS = ("spec_name", "spec_value", "unit")
 
 
 # 財務參數 key 前綴/清單（§七 / §2.6）：限 owner / accounting 可改；其餘設定 owner 可改。
@@ -86,6 +91,9 @@ def create():
             updated_by=_uid(),
         )
         db.add(p)
+        db.flush()
+        write_audit(db, "product_create", "products", p.id,
+                    {"after": snapshot(p, PRODUCT_FIELDS)})   # CR-8
         db.commit()
         flash(f"商品「{name}」已新增", "ok")
         return redirect(url_for("products.detail", pid=p.id))
@@ -145,6 +153,7 @@ def edit(pid):
             flash("名稱為必填", "error")
             return render_template("products/form.html", section="products",
                                    product=p, form=request.form, mode="edit")
+        before = snapshot(p, PRODUCT_FIELDS)
         p.name = name
         p.category = request.form.get("category", "").strip() or None
         p.image_url = request.form.get("image_url", "").strip() or None
@@ -152,6 +161,9 @@ def edit(pid):
         p.active = bool(request.form.get("active"))
         p.updated_by = _uid()
         p.updated_at = datetime.utcnow()
+        b, a = diff(before, snapshot(p, PRODUCT_FIELDS))
+        if a:   # CR-8：只在有變動時留痕（只寫有變的欄）
+            write_audit(db, "product_update", "products", p.id, {"before": b, "after": a})
         db.commit()
         flash("商品已更新", "ok")
         return redirect(url_for("products.detail", pid=p.id))
@@ -175,9 +187,12 @@ def toggle_active(pid):
     p = db.query(Product).get(pid)
     if not p:
         abort(404)
+    was = p.active
     p.active = not p.active
     p.updated_by = _uid()
     p.updated_at = datetime.utcnow()
+    write_audit(db, "product_update", "products", p.id,
+                {"name": p.name, "before": {"active": was}, "after": {"active": p.active}})   # CR-8
     db.commit()
     flash(f"商品「{p.name}」已{'上架' if p.active else '下架'}", "ok")
     return redirect(request.referrer or url_for("products.detail", pid=pid))
@@ -197,12 +212,16 @@ def spec_add(pid):
     if not spec_name:
         flash("規格名稱為必填", "error")
         return redirect(url_for("products.detail", pid=pid))
-    db.add(ProductSpec(
+    spec = ProductSpec(
         product_id=pid,
         spec_name=spec_name,
         spec_value=request.form.get("spec_value", "").strip() or None,
         unit=request.form.get("unit", "").strip() or None,
-    ))
+    )
+    db.add(spec)
+    db.flush()
+    write_audit(db, "product_spec_create", "product_specs", spec.id,
+                {"product_id": pid, "product_name": p.name, "after": snapshot(spec, SPEC_FIELDS)})   # CR-8
     db.commit()
     flash(f"規格「{spec_name}」已新增", "ok")
     return redirect(url_for("products.detail", pid=pid))
@@ -215,6 +234,8 @@ def spec_delete(pid, spec_id):
     spec = db.query(ProductSpec).filter_by(id=spec_id, product_id=pid).first()
     if not spec:
         abort(404)
+    write_audit(db, "product_spec_delete", "product_specs", spec.id,
+                {"product_id": pid, "before": snapshot(spec, SPEC_FIELDS)})   # CR-8
     db.delete(spec)
     db.commit()
     flash("規格已刪除", "ok")
@@ -246,6 +267,7 @@ def threshold_set(pid):
         return redirect(url_for("products.detail", pid=pid))
     row = db.query(InventoryThreshold).filter_by(
         product_id=pid, inventory_pool=pool).first()
+    before_thr = row.threshold_qty if row else None
     if row:
         row.threshold_qty = thr
         row.updated_by = _uid()
@@ -255,6 +277,10 @@ def threshold_set(pid):
             product_id=pid, inventory_pool=pool, threshold_qty=thr,
             updated_by=_uid(),
         ))
+    write_audit(db, "threshold_update", "inventory_thresholds", f"{pid}:{pool}", {   # CR-8
+        "product_id": pid, "product_name": p.name, "pool": pool,
+        "before": {"threshold_qty": before_thr}, "after": {"threshold_qty": thr},
+    })
     db.commit()
     flash(f"{pool} 低水位門檻已設為 {thr}", "ok")
     return redirect(url_for("products.detail", pid=pid))
@@ -356,9 +382,15 @@ def settings_update():
     if not ok:
         flash(f"設定「{key}」{err}", "error")
         return redirect(url_for("products.settings"))
+    old_value = s.value
     s.value = norm
     s.updated_by = _uid()
     s.updated_at = datetime.utcnow()
+    if old_value != norm:   # CR-8：每個變更 key 的 before → after
+        write_audit(db, "setting_update", "settings", key, {
+            "key": key, "description": s.description,
+            "before": {"value": old_value}, "after": {"value": norm},
+        })
     db.commit()
     flash(f"設定「{key}」已更新為 {norm}", "ok")
     return redirect(url_for("products.settings"))

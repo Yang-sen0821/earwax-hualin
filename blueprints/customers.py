@@ -18,8 +18,13 @@ from db import (
     get_session, Customer, CustomerAddress, Order, OrderItem, Product,
     active_orders,
 )
+from audit_util import write_audit, snapshot, diff
 
 customers_bp = Blueprint("customers", __name__, url_prefix="/customers")
+
+# CR-8 留痕欄位
+CUSTOMER_FIELDS = ("name", "phone", "email", "note")
+ADDRESS_FIELDS = ("recipient", "phone", "address", "is_default")
 
 # 可寫角色（owner 由 role_required 自動通過）
 WRITE_ROLES = ("staff",)
@@ -165,6 +170,9 @@ def new():
             updated_by=_uid(),
         )
         db.add(c)
+        db.flush()
+        write_audit(db, "customer_create", "customers", c.id,
+                    {"after": snapshot(c, CUSTOMER_FIELDS)})   # CR-8
         db.commit()
         flash("客戶已建立")
         return redirect(url_for("customers.detail", customer_id=c.id))
@@ -185,11 +193,16 @@ def edit(customer_id):
             flash("姓名為必填")
             return render_template("customers/form.html", section="customers",
                                    customer=c, form=request.form)
+        before = snapshot(c, CUSTOMER_FIELDS)
         c.name = name
         c.phone = (request.form.get("phone") or "").strip() or None
         c.email = (request.form.get("email") or "").strip() or None
         c.note = (request.form.get("note") or "").strip() or None
         c.updated_by = _uid()
+        b, a = diff(before, snapshot(c, CUSTOMER_FIELDS))
+        if a:   # CR-8：只寫有變的欄
+            write_audit(db, "customer_update", "customers", c.id,
+                        {"name": c.name, "before": b, "after": a})
         db.commit()
         flash("客戶已更新")
         return redirect(url_for("customers.detail", customer_id=c.id))
@@ -209,6 +222,9 @@ def delete(customer_id):
     if has_orders:
         flash("此客戶已有訂單，無法刪除")
         return redirect(url_for("customers.detail", customer_id=customer_id))
+    n_addr = db.query(CustomerAddress).filter_by(customer_id=customer_id).count()
+    write_audit(db, "customer_delete", "customers", c.id,
+                {"before": snapshot(c, CUSTOMER_FIELDS), "addresses_deleted": n_addr})   # CR-8
     db.query(CustomerAddress).filter_by(customer_id=customer_id).delete()
     db.delete(c)
     db.commit()
@@ -244,6 +260,10 @@ def address_new(customer_id):
         is_default=is_default,
     )
     db.add(addr)
+    db.flush()
+    write_audit(db, "customer_address_create", "customer_addresses", addr.id,
+                {"customer_id": customer_id, "customer_name": c.name,
+                 "after": snapshot(addr, ADDRESS_FIELDS)})   # CR-8
     db.commit()
     flash("地址已新增")
     return redirect(url_for("customers.detail", customer_id=customer_id))
@@ -260,12 +280,17 @@ def address_edit(customer_id, address_id):
     if not address:
         flash("地址為必填")
         return redirect(url_for("customers.detail", customer_id=customer_id))
+    before = snapshot(addr, ADDRESS_FIELDS)
     addr.recipient = (request.form.get("recipient") or "").strip() or None
     addr.phone = (request.form.get("phone") or "").strip() or None
     addr.address = address
     if request.form.get("is_default") == "on":
         _clear_default(db, customer_id)
         addr.is_default = True
+    b, a = diff(before, snapshot(addr, ADDRESS_FIELDS))
+    if a:   # CR-8
+        write_audit(db, "customer_address_update", "customer_addresses", addr.id,
+                    {"customer_id": customer_id, "before": b, "after": a})
     db.commit()
     flash("地址已更新")
     return redirect(url_for("customers.detail", customer_id=customer_id))
@@ -279,6 +304,8 @@ def address_delete(customer_id, address_id):
     if not addr or addr.customer_id != customer_id:
         abort(404)
     was_default = addr.is_default
+    write_audit(db, "customer_address_delete", "customer_addresses", addr.id,
+                {"customer_id": customer_id, "before": snapshot(addr, ADDRESS_FIELDS)})   # CR-8
     db.delete(addr)
     db.flush()
     # 若刪掉的是預設，且仍有其他地址 → 自動補一個預設
@@ -303,8 +330,13 @@ def address_set_default(customer_id, address_id):
     addr = db.get(CustomerAddress, address_id)
     if not addr or addr.customer_id != customer_id:
         abort(404)
+    was_default = addr.is_default
     _clear_default(db, customer_id)
     addr.is_default = True
+    if not was_default:   # CR-8
+        write_audit(db, "customer_address_update", "customer_addresses", addr.id,
+                    {"customer_id": customer_id, "address": addr.address,
+                     "before": {"is_default": False}, "after": {"is_default": True}})
     db.commit()
     flash("已設為預設地址")
     return redirect(url_for("customers.detail", customer_id=customer_id))
