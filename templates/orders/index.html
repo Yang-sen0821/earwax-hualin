@@ -33,9 +33,32 @@
     <button type="submit" style="padding:8px 16px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">篩選</button>
   </form>
 
+  {# CR-6：列表勾選批次作廢（一個原因套用全批；整批同一交易）。表格包在 POST 表單內，篩選表單已在上方結束。 #}
+  <form method="post" action="{{ url_for('orders.void_bulk') }}{% if request.query_string %}?{{ request.query_string.decode() }}{% endif %}" id="bulk-void-form"
+        onsubmit="return confirmBulkVoid();">
+  {% if can_bulk_void %}
+  <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button type="button" id="bulk-void-toggle" onclick="toggleBulkVoid()"
+            style="padding:8px 14px;border:1px solid #d9b0b0;border-radius:8px;background:#fff;color:#a33;cursor:pointer;">作廢勾選訂單</button>
+    <span class="muted" style="font-size:13px;">已勾選 <strong id="bulk-void-count">0</strong> 筆</span>
+  </div>
+  <div id="bulk-void-panel" hidden style="margin-top:12px;padding:12px;border:1px solid #d9b0b0;border-radius:8px;background:#fbf6f6;">
+    <div class="muted" style="font-size:13px;margin-bottom:8px;">
+      一個原因套用全部勾選訂單；未出貨單庫存<strong>全額回補</strong>，已出貨單<strong>不回補</strong>（需老闆操作），已付款改為已退款。整批同一交易：任一筆失敗全數回復。
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input name="reason" id="bulk-void-reason" maxlength="256" placeholder="作廢原因（必填，套用全部勾選）"
+             style="flex:1;min-width:220px;padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <button type="submit" style="background:#a33;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">確認作廢</button>
+      <button type="button" onclick="toggleBulkVoid(false)" style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">取消</button>
+    </div>
+  </div>
+  {% endif %}
+
   <table style="width:100%;margin-top:16px;border-collapse:collapse;">
     <thead>
       <tr style="text-align:left;border-bottom:2px solid var(--line);">
+        {% if can_bulk_void %}<th style="padding:8px;width:32px;"><input type="checkbox" id="bulk-select-all" title="全選（僅可作廢的單）" onclick="toggleAllBulk(this)"></th>{% endif %}
         <th style="padding:8px;">訂單編號</th>
         <th style="padding:8px;">客戶 / 收件人</th>
         <th style="padding:8px;">金額</th>
@@ -50,6 +73,7 @@
       {% for o in orders %}
       {# CR-4：作廢單灰字＋「已作廢」標示（不隱藏於勾選檢視，但排除所有統計） #}
       <tr style="border-bottom:1px solid var(--line);{% if o.voided_at %}color:#a09a91;text-decoration:line-through;{% endif %}">
+        {% if can_bulk_void %}<td style="padding:8px;">{% if o.voided_at %}<span class="muted" style="text-decoration:none;">—</span>{% else %}<input type="checkbox" name="order_ids" value="{{ o.id }}" class="bulk-void-cb" onchange="updateBulkCount()">{% endif %}</td>{% endif %}
         <td style="padding:8px;"><a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:{{ '#a09a91' if o.voided_at else 'var(--fc)' }};text-decoration:none;font-weight:600;">{{ o.order_no }}</a>{% if o.voided_at %} <span style="font-size:12px;color:#a33;text-decoration:none;display:inline-block;">{{ VOIDED_LABEL }}</span>{% endif %}</td>
         <td style="padding:8px;">
           {% if o.customer_id and cust_map.get(o.customer_id) %}{{ cust_map[o.customer_id].name }}{% else %}{{ o.recipient_name or '—' }}{% endif %}
@@ -62,9 +86,43 @@
         <td style="padding:8px;" class="muted">{{ o.created_at.strftime('%Y-%m-%d %H:%M') if o.created_at else '' }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="muted" style="padding:16px;text-align:center;">尚無訂單</td></tr>
+      <tr><td colspan="{{ 9 if can_bulk_void else 8 }}" class="muted" style="padding:16px;text-align:center;">尚無訂單</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </form>
 </div>
+{% if can_bulk_void %}
+<script>
+  // CR-6：純內建 JS，不用外部庫。全選只選可勾的（作廢單列沒有勾選框）。
+  function bulkCbs() { return Array.prototype.slice.call(document.querySelectorAll('.bulk-void-cb')); }
+  function updateBulkCount() {
+    var n = bulkCbs().filter(function (c) { return c.checked; }).length;
+    document.getElementById('bulk-void-count').textContent = n;
+    var all = document.getElementById('bulk-select-all');
+    if (all) { var total = bulkCbs().length; all.checked = (total > 0 && n === total); }
+  }
+  function toggleAllBulk(src) {
+    bulkCbs().forEach(function (c) { c.checked = src.checked; });
+    updateBulkCount();
+  }
+  function toggleBulkVoid(show) {
+    var panel = document.getElementById('bulk-void-panel');
+    if (typeof show === 'undefined') { show = panel.hidden; }
+    if (show && bulkCbs().filter(function (c) { return c.checked; }).length === 0) {
+      alert('請先勾選要作廢的訂單');
+      return;
+    }
+    panel.hidden = !show;
+    if (show) { document.getElementById('bulk-void-reason').focus(); }
+  }
+  function confirmBulkVoid() {
+    var n = bulkCbs().filter(function (c) { return c.checked; }).length;
+    if (n === 0) { alert('請先勾選要作廢的訂單'); return false; }
+    var reason = document.getElementById('bulk-void-reason').value.trim();
+    if (!reason) { alert('請填寫作廢原因'); document.getElementById('bulk-void-reason').focus(); return false; }
+    return confirm('確定作廢勾選的 ' + n + ' 筆訂單？此動作不可復原。');
+  }
+</script>
+{% endif %}
 {% endblock %}

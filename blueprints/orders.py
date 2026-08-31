@@ -12,6 +12,9 @@
   → 重算 total）與作廢（軟刪除 voided_at/by/reason；未出貨全額回補、已出貨不回補限 owner）；
   兩者皆寫 audit_logs。「已出貨」判定＝shipments 有該單列（或 shipping_status 已為 shipped/delivered，
   相容本修正前由桌面出貨、未建 shipments 列的歷史單）。
+- CR-6（2026-08-31）：桌面列表勾選批次作廢（POST /orders/void-bulk）；規則完全沿用 perform_void，
+  一個原因套用全批、整批同一 tx（任一失敗全數 rollback）、已作廢單跳過、staff 勾到已出貨單整批拒絕；
+  每筆各寫一筆 AuditLog(order_void)，detail 另註 bulk=True / bulk_group_id（同批同一 uuid）。
 
 紅線 R1（本模組對外契約遵守）：
 - 任何改庫存量一律呼叫 inventory_service 的 §4 契約函式（deduct_for_sale / deduct_for_shipment），
@@ -25,6 +28,7 @@ inventory_service.py / 其他 blueprint。
 import csv
 import io
 import json
+import uuid
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -90,11 +94,15 @@ def index():
 
     orders = query.order_by(Order.id.desc()).all()
     cust_map = {c.id: c for c in db.query(Customer).all()}
+    u = current_user()
+    # CR-6：owner / staff 可批次作廢（同單筆作廢的可寫角色；已出貨單限 owner 由路由層再擋）
+    can_bulk_void = bool(u and (u.role == "owner" or u.role in WRITE_ROLES))
     return render_template(
         "orders/index.html", section="orders",
         orders=orders, cust_map=cust_map, q=q,
         payment_statuses=PAYMENT_STATUSES, shipping_statuses=SHIPPING_STATUSES,
         f_pay=pay, f_ship=ship, show_voided=show_voided,
+        can_bulk_void=can_bulk_void,
     )
 
 
@@ -983,14 +991,15 @@ def edit(order_id):
     return redirect(url_for("orders.detail", order_id=order_id))
 
 
-def perform_void(db, order, reason, operator, actor_id, actor_name):
-    """作廢核心（桌面 / 手機共用；權限檢查在路由層）。同一 tx，呼叫端 commit/rollback。
+def perform_void(db, order, reason, operator, actor_id, actor_name, extra_detail=None):
+    """作廢核心（桌面 / 手機 / 批次共用；權限檢查在路由層）。同一 tx，呼叫端 commit/rollback。
 
     - 軟刪除：設 voided_at / voided_by / void_reason；不刪 payments / shipments / order_items。
     - 未出貨 → reverse_sale 全額回補（normal 池，不碰 reserved）。
     - 已出貨（shipments 有列）→ 不回補（貨與袋已出門，退貨另走 RESTOCK 入庫留痕）。
     - payment_status='paid' → 改 'refunded'。
-    - AuditLog(order_void, detail 含 items 快照 / total / movement ids)。
+    - AuditLog(order_void, detail 含 items 快照 / total / movement ids；extra_detail 併入，
+      CR-6 批次用 bulk=True / bulk_group_id）。
     回 (ok, message)。
     """
     if order.voided_at is not None:
@@ -1016,14 +1025,17 @@ def perform_void(db, order, reason, operator, actor_id, actor_name):
     order.void_reason = reason[:256]
     order.updated_by = actor_id
     db.flush()
+    detail = {
+        "reason": reason, "shipped": shipped, "stock_reversed": (not shipped),
+        "payment_status_before": old_pay, "payment_status_after": order.payment_status,
+        "snapshot": snapshot, "reversal_movement_ids": mv_ids,
+    }
+    if extra_detail:
+        detail.update(extra_detail)
     db.add(AuditLog(
         actor_id=actor_id, actor_name=actor_name, action="order_void",
         target_type="orders", target_id=str(order.id),
-        detail=json.dumps({
-            "reason": reason, "shipped": shipped, "stock_reversed": (not shipped),
-            "payment_status_before": old_pay, "payment_status_after": order.payment_status,
-            "snapshot": snapshot, "reversal_movement_ids": mv_ids,
-        }, ensure_ascii=False, default=_json_default),
+        detail=json.dumps(detail, ensure_ascii=False, default=_json_default),
     ))
     msg = f"訂單 {order.order_no} 已作廢" + (
         "（已出貨單：庫存不回補）" if shipped else "（庫存已回補）")
@@ -1057,3 +1069,99 @@ def void(order_id):
         return redirect(url_for("orders.detail", order_id=order_id))
     flash(msg)
     return redirect(url_for("orders.detail", order_id=order_id))
+
+
+@orders_bp.route("/void-bulk", methods=["POST"])
+@role_required(*WRITE_ROLES)
+def void_bulk():
+    """CR-6：列表勾選批次作廢。一個原因套用全批；整批同一 tx，任一失敗全數 rollback。
+
+    - 已作廢單跳過（不重複、不算失敗）。
+    - staff 勾到已出貨單 → 整批拒絕（明列單號），不部分成功；owner 可全批。
+    - 不存在的 id → 整批拒絕。
+    - 每筆各寫一筆 AuditLog(order_void)，detail 註 bulk=True / bulk_group_id（同批同一 uuid）。
+    完成後 flash「已作廢 N 筆（回補 M 筆庫存）」並回列表（保留原篩選條件）。
+    """
+    db = get_session()
+    back = redirect(url_for("orders.index", **request.args.to_dict()))
+
+    raw_ids = request.form.getlist("order_ids")
+    ids = []
+    for v in raw_ids:
+        try:
+            i = int(str(v).strip())
+        except (TypeError, ValueError):
+            flash("勾選資料有誤（訂單 id 非整數），整批未執行")
+            return back
+        if i not in ids:
+            ids.append(i)
+    if not ids:
+        flash("請先勾選要作廢的訂單")
+        return back
+
+    reason = (request.form.get("reason") or "").strip()
+    if not reason:
+        flash("批次作廢必須填寫原因，整批未執行")
+        return back
+
+    u = current_user()
+    is_owner = bool(u and u.role == "owner")
+
+    orders = db.query(Order).filter(Order.id.in_(ids)).all()
+    found = {o.id: o for o in orders}
+    missing = [i for i in ids if i not in found]
+    if missing:
+        flash("以下訂單不存在，整批未執行：" + "、".join(str(i) for i in missing))
+        return back
+
+    targets, skipped = [], []
+    for i in ids:
+        o = found[i]
+        (skipped if o.voided_at is not None else targets).append(o)
+    if not targets:
+        flash("勾選的訂單皆已作廢，無需處理")
+        return back
+
+    shipped_map = {o.id: is_order_shipped(db, o.id) for o in targets}
+    if not is_owner:
+        blocked = [o.order_no for o in targets if shipped_map[o.id]]
+        if blocked:
+            flash("以下訂單已出貨，作廢需由老闆（owner）操作，整批未執行："
+                  + "、".join(blocked))
+            return back
+
+    group_id = uuid.uuid4().hex
+    operator = _operator_name()
+    actor_id = _uid()
+    done = reversed_n = refunded_n = 0
+    try:
+        for o in targets:
+            was_paid = (o.payment_status == "paid")
+            ok, msg = perform_void(
+                db, o, reason, operator, actor_id, operator,
+                extra_detail={"bulk": True, "bulk_group_id": group_id},
+            )
+            if not ok:
+                db.rollback()
+                flash(f"訂單 {o.order_no} 作廢失敗，整批已全數回復：{msg}")
+                return back
+            done += 1
+            if not shipped_map[o.id]:
+                reversed_n += 1
+            if was_paid:
+                refunded_n += 1
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        flash(f"批次作廢失敗，已全數回復：{exc}")
+        return back
+
+    msg = f"已作廢 {done} 筆（回補 {reversed_n} 筆庫存）"
+    if done - reversed_n:
+        msg += f"；已出貨單 {done - reversed_n} 筆不回補"
+    if refunded_n:
+        msg += f"；付款狀態改為已退款 {refunded_n} 筆"
+    if skipped:
+        msg += "；已作廢單跳過 " + "、".join(o.order_no for o in skipped)
+    flash(msg)
+    return back
