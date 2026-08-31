@@ -713,3 +713,43 @@ def check_low_water(session, product_id, inventory_pool, stock_category="normal"
     threshold = thr_row.threshold_qty
     return Result(ok=True, remaining=remaining, threshold=threshold,
                   low_water=(remaining <= threshold))
+
+
+# =========================================================================
+# CR-9（2026-08-31）：歷史輸入 ＝ 現有合計 ＋ 累計消耗（唯讀彙整，不改庫存）
+# =========================================================================
+# 累計消耗計入的 movement_type（只讀 inventory_movements，不含轉移／校正類）：
+#   - SALE + SALE_REVERSAL：qty_delta 淨額取絕對值（作廢／編輯回補後自動扣回）
+#   - 業務出庫 8 類 + PAPERBAG_OUT：|負 qty_delta| 加總
+# 不計入：SPLIT_BOX / RELEASE_RESERVE（池內、分類轉移）、ADJUSTMENT / SEED /
+#   PURCHASE / RESTOCK / IMPORT（已反映在現有合計，不重複加）。
+CONSUMED_SALE_TYPES = ("SALE", "SALE_REVERSAL")
+CONSUMED_OUT_TYPES = ("GIFT", "TRIAL", "PR", "KOL_SAMPLE", "STAFF_USE",
+                      "INSTORE_USE", "SCRAP", "SCRAP_LOSS", "PAPERBAG_OUT")
+
+
+def consumed_by_pool(session):
+    """回 {(product_id, inventory_pool): 累計消耗(int ≥ 0)}，一次聚合查詢。
+
+    歷史輸入(product, pool) = 五分類現有合計 + consumed_by_pool()[(product, pool)]。
+    """
+    from sqlalchemy import func, case
+    sale_net = func.coalesce(func.sum(case(
+        (InventoryMovement.movement_type.in_(CONSUMED_SALE_TYPES), InventoryMovement.qty_delta),
+        else_=0)), 0)
+    out_neg = func.coalesce(func.sum(case(
+        (InventoryMovement.movement_type.in_(CONSUMED_OUT_TYPES) & (InventoryMovement.qty_delta < 0),
+         -InventoryMovement.qty_delta),
+        else_=0)), 0)
+    rows = (
+        session.query(InventoryMovement.product_id, InventoryMovement.inventory_pool,
+                      sale_net, out_neg)
+        .filter(InventoryMovement.movement_type.in_(CONSUMED_SALE_TYPES + CONSUMED_OUT_TYPES))
+        .group_by(InventoryMovement.product_id, InventoryMovement.inventory_pool)
+        .all()
+    )
+    result = {}
+    for pid, pool, s_net, o_neg in rows:
+        consumed = max(0, -int(s_net or 0)) + int(o_neg or 0)
+        result[(pid, pool)] = consumed
+    return result

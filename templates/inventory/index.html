@@ -27,7 +27,7 @@
         <span class="muted" style="font-size:13px; font-weight:400;">（{{ p.sku }}{% if p.is_packaging %}・包材{% endif %}）</span>
       </h3>
       <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:14px;">
+      <table style="border-collapse:collapse; width:100%; min-width:700px; font-size:14px;">
         <thead>
           <tr style="background:#faf8f5;">
             <th style="text-align:left; padding:8px 10px; border:1px solid #e5e0d8;">池 \ 分類</th>
@@ -35,13 +35,22 @@
               <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ cat_labels[c] }}</th>
             {% endfor %}
             <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">合計</th>
+            <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">歷史輸入</th>
+            <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8; color:#8a8177; font-weight:500;">已消耗</th>
           </tr>
         </thead>
         <tbody>
           {% for pool in pools %}
+          {# CR-9：面膜卡的紙袋列——紙袋庫存記於「包材-共用」商品卡；全 0 且無歷史時隱藏，避免誤會 #}
+          {% set pool_hidden = (not p.is_packaging) and pool == 'paper_bag'
+                and hist_map.get((p.id, pool), 0) == 0 %}
+          {% if not pool_hidden %}
           <tr>
             <td style="padding:8px 10px; border:1px solid #e5e0d8; font-weight:600;">
               {{ pool_labels[pool] }}
+              {% if (not p.is_packaging) and pool == 'paper_bag' %}
+                <span class="muted" style="font-size:11px; font-weight:400;">（紙袋庫存記於「包材-共用」）</span>
+              {% endif %}
               {% if low_map.get(p.id, {}).get(pool) is not none %}
                 <span title="低水位 門檻 {{ low_map[p.id][pool] }}"
                   style="color:#a33; font-size:12px;">●低水位</span>
@@ -64,12 +73,15 @@
               </td>
             {% endfor %}
             <td class="pool-total-cell" style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8; font-weight:700; background:#faf8f5;">{{ row_total.v }}</td>
+            <td class="pool-hist-cell" style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8; font-weight:700;">{{ hist_map.get((p.id, pool), row_total.v) }}</td>
+            <td class="pool-consumed-cell" style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8; color:#8a8177; font-size:12px;">{{ consumed_map.get((p.id, pool), 0) }}</td>
           </tr>
+          {% endif %}
           {% endfor %}
         </tbody>
       </table>
       </div>
-      <p class="muted" style="font-size:12px; margin:6px 0 0;">合計＝一般＋預留＋公關＋試用＋損耗；「公關」欄為 2026-08-31 基準修正登入的差額，可直接改格子搬回一般。</p>
+      <p class="muted" style="font-size:12px; margin:6px 0 0;">合計＝一般＋預留＋公關＋試用＋損耗；「公關」欄為 2026-08-31 基準修正登入的差額，可直接改格子搬回一般。<br>歷史輸入＝原始入庫總量＝現有合計＋累計售出／贈送／損耗／紙袋出貨；庫存校正不計入。已消耗＝歷史輸入－合計。</p>
       {% if can_write %}
         <div style="margin-top:8px;">
           <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:8px 18px; border-radius:8px; cursor:pointer;">儲存</button>

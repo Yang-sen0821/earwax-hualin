@@ -10,6 +10,7 @@
         <h3 style="margin:0">{{ pool | pool_label }}</h3>
         <span class="big">{{ bucket.total if bucket else 0 }}</span>
       </div>
+      <div class="pool-hist" style="margin:-4px 0 6px; font-size:12px; color:#8a8177; text-align:right;">歷史輸入 {{ bucket.hist if bucket else 0 }}</div>
       {% if bucket and bucket.rows %}
         {% for r in bucket.rows %}
         <div class="row">

@@ -447,11 +447,16 @@ def inventory():
             prod_map[p.id] = p.name
 
     # 依三池分組摘要：pool -> { 'total': x, 'rows': [...] }
-    pools = {pool: {"total": 0, "rows": []} for pool in INVENTORY_POOLS}
+    pools = {pool: {"total": 0, "rows": [], "hist": 0} for pool in INVENTORY_POOLS}
     for r in rows:
-        bucket = pools.setdefault(r.inventory_pool, {"total": 0, "rows": []})
+        bucket = pools.setdefault(r.inventory_pool, {"total": 0, "rows": [], "hist": 0})
         bucket["total"] += (r.qty or 0)
         bucket["rows"].append(r)
+    # CR-9：歷史輸入 = 現有合計 + 累計消耗（各池加總所有商品；校正／轉移不計）
+    consumed_map = inventory_service.consumed_by_pool(db)
+    for pool, bucket in pools.items():
+        used = sum(v for (_pid, pl), v in consumed_map.items() if pl == pool)
+        bucket["hist"] = bucket["total"] + used
 
     # 愛啪啪庫存（森哥 2026-07-12：手機版也要看得到；唯讀，編輯走桌面版庫存頁）
     # R2 邊界同桌面版：不 import earwax model、不建 FK，僅參數化 raw SQL

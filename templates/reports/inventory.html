@@ -15,13 +15,13 @@
   <h2 style="margin:0;">庫存報表</h2>
   <a class="exp" href="/reports/export.xlsx">匯出 Excel</a>
 </div>
-<p class="muted">目前(normal) / 預留(reserved) / 公關品(pr) / 試用(trial) / 損耗(scrap)；「合計」＝五分類加總；「已售」為 SALE 異動累計（扣除編輯/作廢的銷售回補），掛在各商品首列。</p>
+<p class="muted">目前(normal) / 預留(reserved) / 公關品(pr) / 試用(trial) / 損耗(scrap)；「合計」＝五分類加總；「歷史輸入」＝合計＋該池累計售出／贈送／損耗／紙袋出貨（庫存校正不計入）；「已消耗」＝歷史輸入－合計；「已售」為 SALE 異動累計（扣除編輯/作廢的銷售回補），掛在各商品首列。</p>
 
 <table>
   <thead><tr>
     <th>SKU</th><th>商品</th><th>庫存池</th>
     <th class="num">目前</th><th class="num">預留</th><th class="num">公關品</th>
-    <th class="num">試用</th><th class="num">損耗</th><th class="num">合計</th><th class="num">已售</th><th>單位</th>
+    <th class="num">試用</th><th class="num">損耗</th><th class="num">合計</th><th class="num">歷史輸入</th><th class="num">已消耗</th><th class="num">已售</th><th>單位</th>
   </tr></thead>
   <tbody>
     {% for r in rows %}
@@ -35,11 +35,13 @@
       <td class="num">{{ r.trial }}</td>
       <td class="num">{{ r.scrap }}</td>
       <td class="num" style="font-weight:600;">{{ r.total }}</td>
+      <td class="num" style="font-weight:600;">{{ r.hist_in }}</td>
+      <td class="num" style="color:#8a8177; font-size:12px;">{{ r.consumed }}</td>
       <td class="num">{{ r.sold }}</td>
       <td>{{ r.unit }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="11" class="muted">尚無庫存資料</td></tr>
+    <tr><td colspan="13" class="muted">尚無庫存資料</td></tr>
     {% endfor %}
   </tbody>
 </table>

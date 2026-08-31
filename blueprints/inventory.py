@@ -84,6 +84,17 @@ def index():
     for b in balances:
         bal_map.setdefault(b.product_id, {})[(b.inventory_pool, b.stock_category)] = b.qty
 
+    # CR-9：歷史輸入 = 現有合計 + 累計消耗（售出／贈送／損耗／紙袋出貨；校正與轉移不計）
+    consumed = inv.consumed_by_pool(db)
+    hist_map = {}
+    consumed_map = {}
+    for p in products:
+        for pool in INVENTORY_POOLS:
+            total = sum((bal_map.get(p.id, {}).get((pool, c)) or 0) for c in STOCK_CATEGORIES)
+            used = consumed.get((p.id, pool), 0)
+            consumed_map[(p.id, pool)] = used
+            hist_map[(p.id, pool)] = total + used
+
     # 低水位旗標：product_id -> {pool: bool}
     low_map = {}
     for p in products:
@@ -110,6 +121,7 @@ def index():
     return render_template(
         "inventory/index.html", section="inventory",
         products=products, bal_map=bal_map, low_map=low_map,
+        hist_map=hist_map, consumed_map=consumed_map,
         pools=INVENTORY_POOLS, cats=STOCK_CATEGORIES,
         pool_labels=POOL_LABELS, cat_labels=CAT_LABELS,
         can_write=_can_write(),
