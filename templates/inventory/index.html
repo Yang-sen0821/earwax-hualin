@@ -34,6 +34,7 @@
             {% for c in cats %}
               <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">{{ cat_labels[c] }}</th>
             {% endfor %}
+            <th style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;">合計</th>
           </tr>
         </thead>
         <tbody>
@@ -46,8 +47,10 @@
                   style="color:#a33; font-size:12px;">●低水位</span>
               {% endif %}
             </td>
+            {% set row_total = namespace(v=0) %}
             {% for c in cats %}
               {% set v = bal_map.get(p.id, {}).get((pool, c)) %}
+              {% set row_total.v = row_total.v + (v or 0) %}
               <td style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8;
                 {% if c == 'reserved' %}background:#f6f2ff;{% endif %}
                 {% if v is none %}color:#bbb;{% endif %}">
@@ -60,11 +63,13 @@
                 {% endif %}
               </td>
             {% endfor %}
+            <td class="pool-total-cell" style="text-align:right; padding:8px 10px; border:1px solid #e5e0d8; font-weight:700; background:#faf8f5;">{{ row_total.v }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       </div>
+      <p class="muted" style="font-size:12px; margin:6px 0 0;">合計＝一般＋預留＋公關＋試用＋損耗；「公關」欄為 2026-08-31 基準修正登入的差額，可直接改格子搬回一般。</p>
       {% if can_write %}
         <div style="margin-top:8px;">
           <button type="submit" style="background:#7a6f63; color:#fff; border:none; padding:8px 18px; border-radius:8px; cursor:pointer;">儲存</button>

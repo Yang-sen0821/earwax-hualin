@@ -55,6 +55,16 @@ class InventoryError(Exception):
 
 
 # =========================================================================
+# 池 → 單位（新建 InventoryBalance 列時自動帶入，避免 NULL unit；2026-08-31）
+# =========================================================================
+POOL_UNIT = {
+    "boxed": "box",
+    "loose_piece": "piece",
+    "paper_bag": "bag",
+}
+
+
+# =========================================================================
 # §4.1 銷售組合 → 池對應（鎖定不可改）
 # =========================================================================
 _COMBO_MAP = {
@@ -159,6 +169,7 @@ def _apply_delta(session, product_id, pool, category, delta,
                 bal = InventoryBalance(
                     product_id=product_id, inventory_pool=pool,
                     stock_category=category, qty=0, updated_by=created_by,
+                    unit=POOL_UNIT.get(pool),
                 )
                 session.add(bal)
                 session.flush()
@@ -195,6 +206,7 @@ def _apply_delta(session, product_id, pool, category, delta,
                 bal = InventoryBalance(
                     product_id=product_id, inventory_pool=pool,
                     stock_category=category, qty=0, updated_by=created_by,
+                    unit=POOL_UNIT.get(pool),
                 )
                 session.add(bal)
                 session.flush()

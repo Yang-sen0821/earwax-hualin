@@ -248,6 +248,8 @@ def _inventory_report(db):
     # 已售掛在商品層（不分池）→ 標在該商品第一個池列，其餘填 0 避免重複計
     counted = set()
     for row in result:
+        # 合計 = 五分類加總（2026-08-31：森哥只看「目前」欄誤以為庫存未修正）
+        row["total"] = sum(row[c] for c in ("normal", "reserved", "pr", "trial", "scrap"))
         pid = row["product_id"]
         if pid not in counted:
             row["sold"] = sold_map.get(pid, 0)
