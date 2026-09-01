@@ -12,7 +12,7 @@
   {# CR-10：品項列可「＋ 新增一行」「移除」；儲存時整單反沖 → 重建 → 重扣，任一缺貨整張不變 #}
   <p class="muted" style="margin-top:0;">可新增一行、移除某行、改數量與金額。儲存時系統在同一交易內先回補原品項庫存、再依新品項重新扣減；任一品項缺貨則整張不變。</p>
   {% endif %}
-  <p class="muted" style="margin-top:0;">類型：<b>面膜</b>｜<a href="{{ url_for('earwax_sales.new') }}">愛啪啪</a>（愛啪啪走獨立紀錄，不進面膜報表）</p>
+  <p class="muted" style="margin-top:0;">類型：<b>面膜</b>｜<a href="{{ url_for('earwax_sales.new') }}">外泌體</a>（外泌體走獨立紀錄，不進面膜報表）</p>
   <p class="muted" style="margin-top:0;">多品項可逐列新增；任一品項庫存不足，整張訂單不會建立（同一交易，§4.2）。紙袋可當品項（商品選「包材-共用」、單位「袋」、金額預設 0），扣紙袋庫存。</p>
 
   {% with messages = get_flashed_messages() %}

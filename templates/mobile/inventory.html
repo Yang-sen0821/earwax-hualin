@@ -30,11 +30,11 @@
 
   <div class="card">
     <div class="pool-total">
-      <h3 style="margin:0">愛啪啪</h3>
+      <h3 style="margin:0">外泌體</h3>
       <span class="big">{{ earwax_items | length if earwax_items else 0 }} 項</span>
     </div>
     {% if earwax_error %}
-      <div class="empty">愛啪啪庫存讀取失敗，請重新整理</div>
+      <div class="empty">外泌體庫存讀取失敗，請重新整理</div>
     {% elif earwax_items is none %}
       <div class="empty">（本機測試模式不顯示）</div>
     {% elif earwax_items %}
@@ -51,5 +51,5 @@
       <div class="empty">無資料</div>
     {% endif %}
   </div>
-  <div class="hint" style="text-align:center">愛啪啪為唯讀顯示；編輯請用電腦版庫存頁。</div>
+  <div class="hint" style="text-align:center">外泌體為唯讀顯示；編輯請用電腦版庫存頁。</div>
 {% endblock %}

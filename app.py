@@ -34,13 +34,13 @@ def create_app():
     app.register_blueprint(orders_bp)      # /orders
     app.register_blueprint(customers_bp)   # /customers
     app.register_blueprint(reports_bp)     # /reports
-    app.register_blueprint(earwax_sales_bp)  # /earwax-sales（甲案：愛啪啪獨立紀錄）
+    app.register_blueprint(earwax_sales_bp)  # /earwax-sales（甲案：外泌體獨立紀錄）
     app.register_blueprint(audit_bp)         # /admin/audit（CR-8 操作紀錄；owner/accounting）
     if Config.ENABLE_MOBILE:
         app.register_blueprint(mobile_bp)  # /m
         app.register_blueprint(mobile_audit_bp)  # /m/audit（CR-8 手機簡版）
 
-    # ---- D1：愛啪啪入口可逆隱藏（false 時完全不註冊 earwax，不 import earwax）----
+    # ---- D1：外泌體入口可逆隱藏（false 時完全不註冊 earwax，不 import earwax）----
     if Config.ENABLE_EARWAX_ENTRY:
         # 預留掛回點（地基階段不掛；回復僅改 env，不動 DB）
         pass

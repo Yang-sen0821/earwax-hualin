@@ -37,7 +37,7 @@ from audit_util import write_audit
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
-# 愛啪啪耗材表（R2 邊界：不 import earwax model、不建 FK，僅參數化 raw SQL）。
+# 外泌體耗材表（R2 邊界：不 import earwax model、不建 FK，僅參數化 raw SQL）。
 # EARWAX_TABLE 為固定常數/測試 env 覆寫，非使用者輸入，無注入面。
 EARWAX_TABLE = os.environ.get("EARWAX_TABLE", "earwax.consumables")
 EARWAX_CATEGORIES = ("consumable", "equipment")
@@ -103,7 +103,7 @@ def index():
             if r.low_water:
                 low_map.setdefault(p.id, {})[pool] = r.threshold
 
-    # 愛啪啪庫存區（森哥 2026-07-07：庫存頁分區顯示；同日升級為可編輯，含品名）
+    # 外泌體庫存區（森哥 2026-07-07：庫存頁分區顯示；同日升級為可編輯，含品名）
     # R2 邊界：不 import earwax model、不建 cross-schema FK、僅參數化 raw SQL
     earwax_items = None
     earwax_error = False
@@ -131,7 +131,7 @@ def index():
 
 
 # =========================================================================
-# 愛啪啪耗材編輯 / 新增（森哥 2026-07-07 授權；owner/warehouse；audit_logs 留痕）
+# 外泌體耗材編輯 / 新增（森哥 2026-07-07 授權；owner/warehouse；audit_logs 留痕）
 # =========================================================================
 def _earwax_form_values():
     """共用表單驗證：回 (values, error)。"""
@@ -182,13 +182,13 @@ def earwax_edit(cid):
     db = get_session()
     values, err = _earwax_form_values()
     if err:
-        flash(f"愛啪啪品項未更新：{err}", "error")
+        flash(f"外泌體品項未更新：{err}", "error")
         return redirect(url_for("inventory.index"))
     before = db.execute(text(
         f"SELECT category, name, qty_on_hand, unit_cost, COALESCE(note,'') AS note "
         f"FROM {EARWAX_TABLE} WHERE id = :cid"), {"cid": cid}).mappings().first()
     if before is None:
-        flash("找不到該愛啪啪品項", "error")
+        flash("找不到該外泌體品項", "error")
         return redirect(url_for("inventory.index"))
     try:
         db.execute(text(
@@ -200,9 +200,9 @@ def earwax_edit(cid):
         db.commit()
     except Exception:
         db.rollback()
-        flash("愛啪啪品項更新失敗（資料庫錯誤）", "error")
+        flash("外泌體品項更新失敗（資料庫錯誤）", "error")
         return redirect(url_for("inventory.index"))
-    flash(f"愛啪啪品項「{values['name']}」已更新", "ok")
+    flash(f"外泌體品項「{values['name']}」已更新", "ok")
     return redirect(url_for("inventory.index"))
 
 
@@ -214,7 +214,7 @@ def earwax_new():
     db = get_session()
     values, err = _earwax_form_values()
     if err:
-        flash(f"愛啪啪品項未新增：{err}", "error")
+        flash(f"外泌體品項未新增：{err}", "error")
         return redirect(url_for("inventory.index"))
     try:
         new_id = db.execute(text(
@@ -225,9 +225,9 @@ def earwax_new():
         db.commit()
     except Exception:
         db.rollback()
-        flash("愛啪啪品項新增失敗（資料庫錯誤）", "error")
+        flash("外泌體品項新增失敗（資料庫錯誤）", "error")
         return redirect(url_for("inventory.index"))
-    flash(f"愛啪啪品項「{values['name']}」已新增", "ok")
+    flash(f"外泌體品項「{values['name']}」已新增", "ok")
     return redirect(url_for("inventory.index"))
 
 

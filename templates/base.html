@@ -40,7 +40,7 @@
       <a href="/orders"    class="{{ 'active' if section=='orders' }}">訂單</a>
       <a href="/customers" class="{{ 'active' if section=='customers' }}">客戶</a>
       {% if session.get('role') != 'viewer' %}
-      <a href="/earwax-sales" class="{{ 'active' if section=='earwax_sales' }}">愛啪啪</a>
+      <a href="/earwax-sales" class="{{ 'active' if section=='earwax_sales' }}">外泌體</a>
       {% endif %}
       {% if session.get('role') in ('owner', 'accounting') %}
       <a href="/reports"   class="{{ 'active' if section=='reports' }}">報表</a>

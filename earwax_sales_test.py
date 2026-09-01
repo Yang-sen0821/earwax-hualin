@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""甲案（愛啪啪銷售紀錄）＋手機客戶建立＋員工權限收緊 handler 級測試。
+"""甲案（外泌體銷售紀錄）＋手機客戶建立＋員工權限收緊 handler 級測試。
 
 throwaway sqlite + EARWAX_TABLE 同構表。執行：python earwax_sales_test.py
 """
@@ -46,7 +46,7 @@ c = app.test_client()
 # ---- staff 身分 ----
 c.post("/login", data={"username": "staff", "password": "staff123"})
 
-# 1) staff 建立愛啪啪銷售（桌面路由）
+# 1) staff 建立外泌體銷售（桌面路由）
 r = c.post("/earwax-sales/new", data={"item_id": "1", "qty": "2", "amount": "600",
                                        "note": "測試"}, follow_redirects=True)
 qty = s.execute(text("SELECT qty_on_hand FROM test_earwax_consumables WHERE id=1")).scalar()
@@ -66,7 +66,7 @@ r = c.post("/earwax-sales/new", data={"item_id": "2", "qty": "1", "amount": "0"}
            follow_redirects=True)
 check("3) 儀器不可售", s.query(EarwaxSale).count() == 1)
 
-# 4) 手機版愛啪啪銷售
+# 4) 手機版外泌體銷售
 r = c.post("/m/earwax-sales/new", data={"item_id": "1", "qty": "1", "amount": "300"},
            follow_redirects=True)
 qty = s.execute(text("SELECT qty_on_hand FROM test_earwax_consumables WHERE id=1")).scalar()
@@ -100,7 +100,7 @@ c.get("/logout", follow_redirects=True)
 c.post("/login", data={"username": "viewer", "password": "viewer123"})
 r1 = c.get("/earwax-sales/")
 r2 = c.post("/earwax-sales/new", data={"item_id": "1", "qty": "1", "amount": "0"})
-check("9) viewer 擋愛啪啪清單與寫入", r1.status_code == 403 and r2.status_code == 403,
+check("9) viewer 擋外泌體清單與寫入", r1.status_code == 403 and r2.status_code == 403,
       f"{r1.status_code}/{r2.status_code}")
 
 # ---- owner 身分 ----
@@ -108,7 +108,7 @@ c.get("/logout", follow_redirects=True)
 c.post("/login", data={"username": "owner", "password": "owner123"})
 r1 = c.get("/reports/roi")
 r2 = c.get("/earwax-sales/")
-check("10) owner 看 ROI 與愛啪啪清單", r1.status_code == 200 and r2.status_code == 200,
+check("10) owner 看 ROI 與外泌體清單", r1.status_code == 200 and r2.status_code == 200,
       f"{r1.status_code}/{r2.status_code}")
 
 print("=" * 50)

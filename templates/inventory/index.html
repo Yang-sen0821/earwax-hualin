@@ -102,16 +102,16 @@
   {% endif %}
 
   <hr style="border:none; border-top:1px solid #e5e0d8; margin:26px 0 18px;">
-  <h2 style="margin:0 0 6px; font-size:19px;">愛啪啪</h2>
+  <h2 style="margin:0 0 6px; font-size:19px;">外泌體</h2>
   {% if can_write %}
     <p class="muted">各欄位可直接修改後按「儲存」；最下方可新增品項。每次修改都會留存紀錄。</p>
   {% else %}
     <p class="muted">唯讀顯示；編輯需 owner／倉管／員工權限。</p>
   {% endif %}
   {% if earwax_error %}
-    <p style="color:#a33;">愛啪啪庫存讀取失敗，請重新整理；持續失敗請通知管理員。</p>
+    <p style="color:#a33;">外泌體庫存讀取失敗，請重新整理；持續失敗請通知管理員。</p>
   {% elif earwax_items is none %}
-    <p class="muted">（本機測試模式不顯示愛啪啪庫存）</p>
+    <p class="muted">（本機測試模式不顯示外泌體庫存）</p>
   {% else %}
     <div style="overflow-x:auto;">
     <table style="border-collapse:collapse; width:100%; min-width:640px; font-size:14px;">
@@ -162,7 +162,7 @@
         </tr>
         {% endfor %}
         {% if not earwax_items %}
-        <tr><td colspan="{{ 6 if can_write else 5 }}" style="padding:10px; border:1px solid #e5e0d8;" class="muted">愛啪啪目前沒有庫存品項。</td></tr>
+        <tr><td colspan="{{ 6 if can_write else 5 }}" style="padding:10px; border:1px solid #e5e0d8;" class="muted">外泌體目前沒有庫存品項。</td></tr>
         {% endif %}
         {% if can_write %}
         <tr style="background:#faf8f5;">

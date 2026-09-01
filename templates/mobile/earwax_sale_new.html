@@ -1,10 +1,10 @@
 {% extends "mobile/_base.html" %}
-{% block title %}新增愛啪啪紀錄{% endblock %}
-{% block heading %}愛啪啪 新增紀錄{% endblock %}
+{% block title %}新增外泌體紀錄{% endblock %}
+{% block heading %}外泌體 新增紀錄{% endblock %}
 {% block back %}<a href="/m/earwax-sales" class="back">‹</a>{% endblock %}
 {% set active_tab = 'new' %}
 {% block content %}
-  <div class="hint" style="margin-bottom:8px;">類型：<a href="/m/orders/new">面膜</a>｜<b>愛啪啪</b></div>
+  <div class="hint" style="margin-bottom:8px;">類型：<a href="/m/orders/new">面膜</a>｜<b>外泌體</b></div>
   <form method="post" action="/m/earwax-sales/new">
     <div class="card">
       <label>品項（僅消耗品）</label>
@@ -22,5 +22,5 @@
     </div>
     <button class="btn btn-primary btn-block" type="submit">記錄（扣庫存）</button>
   </form>
-  <div class="hint" style="text-align:center">扣愛啪啪庫存並留痕；金額不進面膜報表。</div>
+  <div class="hint" style="text-align:center">扣外泌體庫存並留痕；金額不進面膜報表。</div>
 {% endblock %}

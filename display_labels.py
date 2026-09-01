@@ -123,10 +123,10 @@ ACTION_LABELS = {
     "expense_create": "新增支出",
     "expense_update": "編輯支出",
     "expense_delete": "刪除支出",
-    # 愛啪啪
-    "earwax_sale_create": "愛啪啪銷售",
-    "earwax_consumable_edit": "編輯愛啪啪耗材",
-    "earwax_consumable_create": "新增愛啪啪耗材",
+    # 外泌體
+    "earwax_sale_create": "外泌體銷售",
+    "earwax_consumable_edit": "編輯外泌體耗材",
+    "earwax_consumable_create": "新增外泌體耗材",
     # 登入
     "login_ok": "登入成功",
     "login_fail": "登入失敗",
@@ -143,8 +143,8 @@ TARGET_TYPE_LABELS = {
     "customers": "客戶",
     "customer_addresses": "客戶地址",
     "extra_expenses": "支出",
-    "earwax_sales": "愛啪啪銷售",
-    "earwax.consumables": "愛啪啪耗材",
+    "earwax_sales": "外泌體銷售",
+    "earwax.consumables": "外泌體耗材",
     "users": "帳號",
 }
 

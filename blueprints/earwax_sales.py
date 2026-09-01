@@ -1,4 +1,4 @@
-"""earwax_sales blueprint（/earwax-sales）— 愛啪啪銷售/使用紀錄（甲案 2026-07-12）。
+"""earwax_sales blueprint（/earwax-sales）— 外泌體銷售/使用紀錄（甲案 2026-07-12）。
 
 獨立核算：收入完全不進面膜訂單與報表。
 寫入＝同一交易：INSERT earwax_sales ＋ 扣 earwax.consumables.qty_on_hand（不足擋下）
@@ -41,7 +41,7 @@ def _sellable_items(db):
 
 
 def create_sale(db, item_id, qty, amount, note, operator, created_by):
-    """建立一筆愛啪啪銷售：同交易扣庫存＋寫紀錄＋留痕。回 (ok, msg)。
+    """建立一筆外泌體銷售：同交易扣庫存＋寫紀錄＋留痕。回 (ok, msg)。
 
     呼叫端負責 commit/rollback。
     """

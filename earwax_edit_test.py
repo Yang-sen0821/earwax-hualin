@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""愛啪啪庫存編輯功能 handler 級測試（throwaway sqlite + EARWAX_TABLE 同構表覆寫）。
+"""外泌體庫存編輯功能 handler 級測試（throwaway sqlite + EARWAX_TABLE 同構表覆寫）。
 
 驗：顯示、編輯寫入、新增、驗證擋壞資料、權限 403、audit_logs 留痕。
 執行：python earwax_edit_test.py
@@ -53,7 +53,7 @@ c = app.test_client()
 c.post("/login", data={"username": "owner", "password": "owner123"})
 r = c.get("/inventory/", follow_redirects=True)
 html = r.get_data(as_text=True)
-check("1) owner 看到愛啪啪區與品項", r.status_code == 200 and "銀" in html and "愛啪啪" in html,
+check("1) owner 看到外泌體區與品項", r.status_code == 200 and "銀" in html and "外泌體" in html,
       f"status={r.status_code}")
 
 # 2) owner 編輯（改名/量/成本/備註/類別）
@@ -92,7 +92,7 @@ r = c.post("/inventory/earwax/1/edit", data={"name": "銀安瓶", "category": "c
                                               "qty_on_hand": "9", "unit_cost": "0", "note": ""})
 s.expire_all()
 row = s.execute(text("SELECT name, qty_on_hand FROM test_earwax_consumables WHERE id=1")).first()
-check("6) staff 可編輯愛啪啪品項（2026-08-19 放寬）", r.status_code in (200, 302) and row[1] == 9,
+check("6) staff 可編輯外泌體品項（2026-08-19 放寬）", r.status_code in (200, 302) and row[1] == 9,
       f"status={r.status_code} row={tuple(row)}")
 
 # 6b) 權限下界：viewer 仍被擋（403）且值不動

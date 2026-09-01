@@ -545,7 +545,7 @@ def inventory():
         used = sum(v for (_pid, pl), v in consumed_map.items() if pl == pool)
         bucket["hist"] = bucket["total"] + used
 
-    # 愛啪啪庫存（森哥 2026-07-12：手機版也要看得到；唯讀，編輯走桌面版庫存頁）
+    # 外泌體庫存（森哥 2026-07-12：手機版也要看得到；唯讀，編輯走桌面版庫存頁）
     # R2 邊界同桌面版：不 import earwax model、不建 FK，僅參數化 raw SQL
     from sqlalchemy import text
 
@@ -736,7 +736,7 @@ def customer_new():
 
 
 # -------------------------------------------------------------------------
-# 愛啪啪銷售/使用紀錄（甲案 2026-07-12；邏輯共用 blueprints.earwax_sales.create_sale）
+# 外泌體銷售/使用紀錄（甲案 2026-07-12；邏輯共用 blueprints.earwax_sales.create_sale）
 # -------------------------------------------------------------------------
 @mobile_bp.route("/earwax-sales")
 @role_required("staff", "warehouse", "accounting")

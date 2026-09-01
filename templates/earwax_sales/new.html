@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}新增愛啪啪紀錄 — Flora Court{% endblock %}
+{% block title %}新增外泌體紀錄 — Flora Court{% endblock %}
 {% block content %}
 <div class="card" style="max-width:560px;">
-  <h2 style="margin-top:0;">新增愛啪啪銷售／使用紀錄</h2>
-  <p class="muted">扣愛啪啪庫存、全程留痕；金額不進面膜報表。純耗用（不收費）金額填 0。</p>
+  <h2 style="margin-top:0;">新增外泌體銷售／使用紀錄</h2>
+  <p class="muted">扣外泌體庫存、全程留痕；金額不進面膜報表。純耗用（不收費）金額填 0。</p>
 
   {% with msgs = get_flashed_messages(with_categories=true) %}
     {% for cat, m in msgs %}<div style="margin-bottom:8px; color:{{ '#a33' if cat == 'error' else '#2b7a2b' }};">{{ m }}</div>{% endfor %}
