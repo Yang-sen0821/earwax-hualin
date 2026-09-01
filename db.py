@@ -162,6 +162,10 @@ class Customer(Base):
     phone = Column(String(32))
     email = Column(String(128))
     note = Column(Text)
+    # CR-12（2026-09-01）：客戶階級 general=一般客戶 / dealer=經銷商 / agent=代理商（閉集見 display_labels.CUSTOMER_TIERS）。
+    # 線上 PostgreSQL 由 DBA 手動：ALTER TABLE customers ADD COLUMN IF NOT EXISTS tier VARCHAR(32) NOT NULL DEFAULT 'general'
+    # 分潤自動計算不做（初版尚未落地）。
+    tier = Column(String(32), nullable=False, default="general", server_default="general")
     created_by = Column(Integer, ForeignKey(_fk("users.id")))
     updated_by = Column(Integer, ForeignKey(_fk("users.id")))
     created_at = Column(DateTime, default=datetime.utcnow)

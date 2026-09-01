@@ -19,11 +19,12 @@ from db import (
     active_orders,
 )
 from audit_util import write_audit, snapshot, diff
+from display_labels import CUSTOMER_TIER_CODES, DEFAULT_CUSTOMER_TIER
 
 customers_bp = Blueprint("customers", __name__, url_prefix="/customers")
 
 # CR-8 留痕欄位
-CUSTOMER_FIELDS = ("name", "phone", "email", "note")
+CUSTOMER_FIELDS = ("name", "phone", "email", "note", "tier")   # CR-12 加 tier（audit before/after 一併帶）
 ADDRESS_FIELDS = ("recipient", "phone", "address", "is_default")
 
 # 可寫角色（owner 由 role_required 自動通過）
@@ -86,11 +87,25 @@ def customer_summary(orders):
 # -------------------------------------------------------------------------
 # 列表 / 查詢
 # -------------------------------------------------------------------------
+def parse_tier(raw, default=DEFAULT_CUSTOMER_TIER):
+    """CR-12：表單階級值 → (tier, error)。空值＝預設一般客戶；非閉集值拒絕。桌面／手機共用。"""
+    v = (raw or "").strip()
+    if not v:
+        return default, None
+    if v not in CUSTOMER_TIER_CODES:
+        return None, f"無效的客戶階級：{v}"
+    return v, None
+
+
 @customers_bp.route("/")
 @login_required
 def index():
     db = get_session()
     q = (request.args.get("q") or "").strip()
+    # CR-12：?tier= 篩選（閉集外的值忽略＝不篩）
+    f_tier = (request.args.get("tier") or "").strip()
+    if f_tier not in CUSTOMER_TIER_CODES:
+        f_tier = ""
     query = db.query(Customer)
     if q:
         like = f"%{q}%"
@@ -99,6 +114,8 @@ def index():
             | (Customer.phone.like(like))
             | (Customer.email.like(like))
         )
+    if f_tier:
+        query = query.filter(Customer.tier == f_tier)
     customers = query.order_by(Customer.id.desc()).all()
     # CR-3：每位客戶 訂單數 / 累計金額 / 最近購買（口徑同 reports._customer_ranking）；
     #        ?sort=rank 依累計金額 desc、次鍵訂單數 desc；預設仍依 id desc。金額欄僅 AMOUNT_ROLES。
@@ -113,7 +130,7 @@ def index():
         ))
     return render_template(
         "customers/index.html", section="customers", customers=customers, q=q,
-        stats=stats, sort=sort, show_amount=can_see_amount(),
+        stats=stats, sort=sort, show_amount=can_see_amount(), f_tier=f_tier,
     )
 
 
@@ -167,11 +184,17 @@ def new():
             flash("姓名為必填")
             return render_template("customers/form.html", section="customers",
                                    customer=None, form=request.form)
+        tier, tier_err = parse_tier(request.form.get("tier"))   # CR-12
+        if tier_err:
+            flash(tier_err)
+            return render_template("customers/form.html", section="customers",
+                                   customer=None, form=request.form)
         c = Customer(
             name=name,
             phone=(request.form.get("phone") or "").strip() or None,
             email=(request.form.get("email") or "").strip() or None,
             note=(request.form.get("note") or "").strip() or None,
+            tier=tier,
             created_by=_uid(),
             updated_by=_uid(),
         )
@@ -199,11 +222,18 @@ def edit(customer_id):
             flash("姓名為必填")
             return render_template("customers/form.html", section="customers",
                                    customer=c, form=request.form)
+        # CR-12：階級沒帶欄位＝維持原值；帶了就驗閉集
+        tier, tier_err = parse_tier(request.form.get("tier"), default=(c.tier or DEFAULT_CUSTOMER_TIER))
+        if tier_err:
+            flash(tier_err)
+            return render_template("customers/form.html", section="customers",
+                                   customer=c, form=request.form)
         before = snapshot(c, CUSTOMER_FIELDS)
         c.name = name
         c.phone = (request.form.get("phone") or "").strip() or None
         c.email = (request.form.get("email") or "").strip() or None
         c.note = (request.form.get("note") or "").strip() or None
+        c.tier = tier
         c.updated_by = _uid()
         b, a = diff(before, snapshot(c, CUSTOMER_FIELDS))
         if a:   # CR-8：只寫有變的欄

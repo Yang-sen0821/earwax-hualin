@@ -21,6 +21,13 @@
     {{ field('phone', '電話', (customer.phone if customer else form.get('phone','')) or '') }}
     {{ field('email', 'Email', (customer.email if customer else form.get('email','')) or '') }}
 
+    {# CR-12：客戶階級（一般客戶／經銷商／代理商），預設一般客戶；分潤計算不做 #}
+    {% set cur_tier = form.get('tier') or (customer.tier if customer else '') or 'general' %}
+    <label style="display:block;margin:12px 0 4px;">客戶階級</label>
+    <select name="tier" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">
+      {% for code, label in CUSTOMER_TIERS %}<option value="{{ code }}" {{ 'selected' if cur_tier == code }}>{{ label }}</option>{% endfor %}
+    </select>
+
     <label style="display:block;margin:12px 0 4px;">備註</label>
     <textarea name="note" rows="3"
               style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;">{{ (customer.note if customer else form.get('note','')) or '' }}</textarea>

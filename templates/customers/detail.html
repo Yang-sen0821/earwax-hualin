@@ -24,7 +24,7 @@
     </form>
   </div>
   <p class="muted" style="margin:8px 0 0;">
-    電話：{{ customer.phone or '—' }}　|　Email：{{ customer.email or '—' }}
+    階級：<strong id="customer-tier" style="color:var(--fc);">{{ customer.tier | tier_label }}</strong>　|　電話：{{ customer.phone or '—' }}　|　Email：{{ customer.email or '—' }}
   </p>
   {% if customer.note %}<p style="margin:8px 0 0;">備註：{{ customer.note }}</p>{% endif %}
   <p style="margin-top:12px;"><a href="{{ url_for('customers.index') }}" style="color:var(--fc);text-decoration:none;">← 返回客戶列表</a></p>

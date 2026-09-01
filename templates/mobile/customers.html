@@ -17,7 +17,7 @@
       <a class="itemlink" href="/m/customers/{{ c.id }}">
       <div class="row">
         <div class="grow">
-          <div class="ttl2">{{ c.name }}</div>
+          <div class="ttl2">{{ c.name }} <span class="badge b-other">{{ c.tier | tier_label }}</span></div>
           <div class="sub">{{ c.phone or '—' }}{% if c.email %}　{{ c.email }}{% endif %}</div>
           {% if c.note %}<div class="sub">{{ c.note }}</div>{% endif %}
         </div>

@@ -7,6 +7,9 @@
   {# CR-2 手機客戶明細：客戶資料 + 交易紀錄；作廢單不列、不計小計；金額欄僅 owner/accounting #}
   <div class="card">
     <h3>客戶資料</h3>
+    {# CR-12：階級 #}
+    <div class="row"><div class="grow"><div class="sub">階級</div>
+      <div class="ttl2">{{ customer.tier | tier_label }}</div></div></div>
     <div class="row"><div class="grow"><div class="sub">電話</div>
       <div class="ttl2">{{ customer.phone or '—' }}</div></div></div>
     <div class="row"><div class="grow"><div class="sub">Email</div>

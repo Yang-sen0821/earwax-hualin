@@ -707,18 +707,25 @@ def customer_new():
             flash("姓名為必填")
             return render_template("mobile/customer_new.html", section="mobile",
                                    user=current_user(), form=request.form)
+        from blueprints.customers import parse_tier   # CR-12：與桌面同閉集驗證
+        tier, tier_err = parse_tier(request.form.get("tier"))
+        if tier_err:
+            flash(tier_err)
+            return render_template("mobile/customer_new.html", section="mobile",
+                                   user=current_user(), form=request.form)
         c = Customer(
             name=name,
             phone=(request.form.get("phone") or "").strip() or None,
             email=(request.form.get("email") or "").strip() or None,
             note=(request.form.get("note") or "").strip() or None,
+            tier=tier,
             created_by=u.id if u else None,
             updated_by=u.id if u else None,
         )
         db.add(c)
         db.flush()
         write_audit(db, "customer_create", "customers", c.id, {   # CR-8
-            "after": {"name": c.name, "phone": c.phone, "email": c.email, "note": c.note},
+            "after": {"name": c.name, "phone": c.phone, "email": c.email, "note": c.note, "tier": c.tier},
             "via": "mobile",
         })
         db.commit()

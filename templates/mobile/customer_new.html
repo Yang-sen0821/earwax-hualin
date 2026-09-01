@@ -12,6 +12,10 @@
       <input type="tel" name="phone" value="{{ form.get('phone', '') }}" autocomplete="off">
       <label>Email</label>
       <input type="email" name="email" value="{{ form.get('email', '') }}" autocomplete="off">
+      <label>客戶階級</label>
+      <select name="tier">
+        {% for code, label in CUSTOMER_TIERS %}<option value="{{ code }}" {{ 'selected' if (form.get('tier') or 'general') == code }}>{{ label }}</option>{% endfor %}
+      </select>
       <label>備註</label>
       <textarea name="note">{{ form.get('note', '') }}</textarea>
     </div>

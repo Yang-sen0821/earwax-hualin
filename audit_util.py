@@ -17,7 +17,7 @@ from decimal import Decimal
 from db import AuditLog
 from display_labels import (
     action_label, payment_label, shipping_label, pool_label, cat_label,
-    mtype_label, combo_label, shipping_method_label,
+    mtype_label, combo_label, shipping_method_label, tier_label,
 )
 
 # 不得寫值的欄位（只寫「已變更」）
@@ -38,7 +38,7 @@ FIELD_LABELS = {
     "threshold_qty": "門檻", "inventory_pool": "庫存池",
     "spec_name": "規格名", "spec_value": "規格值", "unit": "單位",
     "qty_on_hand": "數量", "unit_cost": "單位成本",
-    "customer_id": "客戶", "customer_name": "客戶",
+    "customer_id": "客戶", "customer_name": "客戶", "tier": "階級",
     "lines_added": "新增行", "lines_removed": "刪除行", "lines_changed": "修改行",
     "items_locked": "品項鎖定",
 }
@@ -54,6 +54,7 @@ _VALUE_LABELERS = {
     "category_code": cat_label,
     "movement_type": mtype_label,
     "combo_code": combo_label,
+    "tier": tier_label,   # CR-12
 }
 
 

@@ -169,6 +169,21 @@ def combo_label(code):
     return _lookup(COMBO_LABELS, code)
 
 
+# CR-12（2026-09-01）客戶階級閉集（可維護常數；順序即下拉順序；第一個為預設）
+CUSTOMER_TIERS = (
+    ("general", "一般客戶"),
+    ("dealer", "經銷商"),
+    ("agent", "代理商"),
+)
+CUSTOMER_TIER_CODES = tuple(code for code, _ in CUSTOMER_TIERS)
+DEFAULT_CUSTOMER_TIER = CUSTOMER_TIERS[0][0]
+TIER_LABELS = dict(CUSTOMER_TIERS)
+
+
+def tier_label(code):
+    return _lookup(TIER_LABELS, code or DEFAULT_CUSTOMER_TIER)
+
+
 def pool_label(code):
     return _lookup(POOL_LABELS, code)
 
@@ -224,6 +239,7 @@ def register_display_helpers(app):
     app.add_template_filter(role_label, "role_label")
     app.add_template_filter(action_label, "action_label")
     app.add_template_filter(target_type_label, "target_type_label")
+    app.add_template_filter(tier_label, "tier_label")   # CR-12 客戶階級
 
     @app.context_processor
     def _inject_label_maps():
@@ -238,6 +254,8 @@ def register_display_helpers(app):
             "SHIPPING_METHOD_LABELS": SHIPPING_METHOD_LABELS,
             "VOIDED_LABEL": VOIDED_LABEL,
             "ROLE_LABELS": ROLE_LABELS,
+            "CUSTOMER_TIERS": CUSTOMER_TIERS,   # CR-12：下拉用 (code, 中文)
+            "TIER_LABELS": TIER_LABELS,
             "ACTION_LABELS": ACTION_LABELS,
             "TARGET_TYPE_LABELS": TARGET_TYPE_LABELS,
         }
