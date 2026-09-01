@@ -5,10 +5,10 @@ throwaway sqlite 放 %TEMP%，不污染交付庫；env 在 import 任何 app 模
 驗證項目：
   A 事件寫入：建單(order_create) / 改付款 / 改出貨(桌面+手機) / 設定變更 / 客戶新增+編輯+刪除 /
     商品編輯 / 支出新增 / 庫存補貨 / 登入成功+失敗 → 各產生對應 audit，detail 含 before/after
-  B 權限：/admin/audit owner 200、accounting 200、staff 403、viewer 403、未登入導向登入
+  B 權限：/admin/audit owner 200、accounting 200、staff 200、viewer 200（2026-09-01 全帳號可檢視）、未登入導向登入
   C 篩選：帳號（只剩該帳號）、動作類型、日期 from/to（未來日期 0 筆、今日含全部）、關鍵字（單號）
   D 顯示：action 中文（建立訂單／改付款狀態…）、摘要含 before → after、對象連到訂單明細、<details> 原始 JSON、分頁
-  E 手機 /m/audit：owner 200、staff 403
+  E 手機 /m/audit：owner 200、staff 200（全帳號可檢視）
   F Excel：export_all 含「操作紀錄」分頁、表頭正確、含建單列
   G 密碼類不寫值：login 的 detail 不含 password 字串
 """
@@ -245,14 +245,14 @@ def main():
     r = acct.get("/admin/audit/")
     check("B accounting /admin/audit 200", r.status_code == 200, f"got {r.status_code}")
     r = staff.get("/admin/audit/")
-    check("B staff /admin/audit 403", r.status_code == 403, f"got {r.status_code}")
+    check("B staff /admin/audit 200（全帳號可檢視）", r.status_code == 200, f"got {r.status_code}")
     r = viewer.get("/admin/audit/")
-    check("B viewer /admin/audit 403", r.status_code == 403, f"got {r.status_code}")
+    check("B viewer /admin/audit 200（全帳號可檢視）", r.status_code == 200, f"got {r.status_code}")
     r = anon.get("/admin/audit/")
     check("B 未登入導向 /login", r.status_code == 302 and "/login" in r.headers.get("Location", ""))
     check("B 導覽列 owner 見「操作紀錄」", "操作紀錄" in html_owner and 'href="/admin/audit/"' in html_owner)
     r = staff.get("/orders/")
-    check("B 導覽列 staff 不見「操作紀錄」入口", 'href="/admin/audit/"' not in r.get_data(as_text=True))
+    check("B 導覽列 staff 可見「操作紀錄」入口（全帳號可檢視）", 'href="/admin/audit/"' in r.get_data(as_text=True))
 
     # ---- D 顯示 ----
     check("D action 中文：建立訂單", "建立訂單" in html_owner)
@@ -311,11 +311,11 @@ def main():
     h = r.get_data(as_text=True)
     check("E /m/audit owner 200 且含建立訂單", r.status_code == 200 and "建立訂單" in h)
     r = staff.get("/m/audit")
-    check("E /m/audit staff 403", r.status_code == 403, f"got {r.status_code}")
+    check("E /m/audit staff 200（全帳號可檢視）", r.status_code == 200, f"got {r.status_code}")
     r = owner.get("/m/")
     check("E 手機首頁 owner 見操作紀錄入口", 'href="/m/audit"' in r.get_data(as_text=True))
     r = staff.get("/m/")
-    check("E 手機首頁 staff 不見操作紀錄入口", 'href="/m/audit"' not in r.get_data(as_text=True))
+    check("E 手機首頁 staff 可見操作紀錄入口（全帳號可檢視）", 'href="/m/audit"' in r.get_data(as_text=True))
 
     # ---- F Excel ----
     r = owner.get("/reports/export.xlsx")

@@ -2,7 +2,7 @@
 
 森哥原話：「另外要有後台顯示哪個帳號在甚麼時候做過什麼編輯」。
 - 資料來源：audit_logs（各 blueprint 經 audit_util.write_audit 寫入；本頁只讀，不寫）。
-- 權限：owner / accounting（role_required；其他角色 403）。
+- 權限：所有登入帳號可檢視（唯讀；森哥 2026-09-01 09:36「異動紀錄全帳號可檢視」）；寫入仍由系統。
 - 桌面：列表（時間降冪、每頁 50）＋ 篩選（日期 from/to、帳號、動作類型、對象/關鍵字）＋ 每列人話摘要
   ＋ <details> 展開原始 JSON。訂單／商品／客戶類對象可連到明細頁。
 - 手機：/m/audit 簡版（最近 100 筆，同權限）。
@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, url_for
 from sqlalchemy import or_
 
-from auth import role_required, current_user
+from auth import login_required, current_user
 from db import get_session, AuditLog, User
 from display_labels import action_label, target_type_label, ACTION_LABELS
 from audit_util import parse_detail, summarize, to_local, fmt_ts
@@ -22,7 +22,7 @@ from audit_util import parse_detail, summarize, to_local, fmt_ts
 audit_bp = Blueprint("audit_log", __name__, url_prefix="/admin/audit")
 mobile_audit_bp = Blueprint("mobile_audit", __name__, url_prefix="/m")
 
-READ_ROLES = ("accounting",)   # owner 由 role_required 永遠通過
+READ_ROLES = ()   # 2026-09-01 起全帳號可讀（login_required）
 PAGE_SIZE = 50
 MOBILE_LIMIT = 100
 
@@ -146,7 +146,7 @@ def _action_options(db):
 
 
 @audit_bp.route("/")
-@role_required(*READ_ROLES)
+@login_required
 def index():
     db = get_session()
     f = _filters()
@@ -173,7 +173,7 @@ def index():
 
 
 @mobile_audit_bp.route("/audit")
-@role_required(*READ_ROLES)
+@login_required
 def mobile_index():
     """手機簡版：最近 100 筆（同權限；只支援動作類型 / 帳號快篩）。"""
     db = get_session()

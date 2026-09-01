@@ -46,8 +46,9 @@
       <a href="/reports"   class="{{ 'active' if section=='reports' }}">報表</a>
       <a href="/reports/expenses" class="{{ 'active' if section=='expenses' }}">支出管理</a>
       <a href="/reports/customers" class="{{ 'active' if section=='customer_ranking' }}">客戶排行</a>
-      <a href="/admin/audit/" class="{{ 'active' if section=='audit' }}">操作紀錄</a>
       {% endif %}
+      {# 森哥 2026-09-01 09:36「異動紀錄全帳號可檢視」：操作紀錄對所有登入角色開放（唯讀） #}
+      <a href="/admin/audit/" class="{{ 'active' if section=='audit' }}">操作紀錄</a>
       <a href="/m"         class="{{ 'active' if section=='mobile' }}">手機版</a>
       <span class="spacer"></span>
       <a href="/logout" class="logout">登出</a>
