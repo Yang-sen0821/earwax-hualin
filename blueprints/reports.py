@@ -67,6 +67,7 @@ def _combo_label_map(db):
     # 新模型單位（建單只產生這兩個）：LOOSE=片、BOX=盒
     m.setdefault("LOOSE", "片")
     m.setdefault("BOX", "盒")
+    m.setdefault("BAG", "袋")   # 2026-09-01 紙袋當品項
     # 舊四個閉集 code 相容（歷史資料）
     fallback = {"SINGLE": "單片體驗組", "BOX1": "經典盒裝",
                 "BOX3": "植萃養膚組", "BOX10": "尊寵囤貨組"}

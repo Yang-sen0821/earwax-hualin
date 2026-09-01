@@ -43,8 +43,8 @@ mobile_bp = Blueprint("mobile", __name__, url_prefix="/m")
 ORDER_WRITE_ROLES = ("staff",)
 SHIPMENT_WRITE_ROLES = ("staff", "warehouse")
 
-# 建單品項單位閉集（新模型，對齊桌面 orders）：LOOSE=片(扣裸片池)/BOX=盒(扣盒裝池)。
-UNIT_CODES = ("LOOSE", "BOX")
+# 建單品項單位閉集（新模型，對齊桌面 orders）：LOOSE=片(扣裸片池)/BOX=盒(扣盒裝池)/BAG=袋(扣紙袋池，2026-09-01)。
+UNIT_CODES = ("LOOSE", "BOX", "BAG")
 
 # 運送方式閉集（CR-5，與桌面 orders.SHIPPING_METHODS 同源）
 SHIPPING_METHODS = ("711", "post", "pickup", "other")
@@ -221,6 +221,90 @@ def order_detail(order_id):
         combo_codes=COMBO_CODES,
         is_shipped=shipped, is_voided=(order.voided_at is not None),
         can_void=(role == "owner" or (role in ORDER_WRITE_ROLES and not shipped)),
+        can_edit=(role == "owner" or role in ORDER_WRITE_ROLES),
+    )
+
+
+# -------------------------------------------------------------------------
+# 編輯品項（CR-10 手機簡版：新增一行／刪除一行／改數量金額／折扣；核心共用 blueprints.orders.perform_edit）
+# -------------------------------------------------------------------------
+def _parse_edit_lines():
+    """手機編輯頁平行陣列 product_id[] / combo_code[] / qty[] / amount[] → (rows, error)。
+    rows 為 orders._parse_items 同格式（product_id / combo_code / qty / unit_price / subtotal）。空白列略過。"""
+    product_ids = request.form.getlist("product_id")
+    combo_codes = request.form.getlist("combo_code")
+    qtys = request.form.getlist("qty")
+    amounts = request.form.getlist("amount")
+    rows = []
+    for i, pid_s in enumerate(product_ids):
+        pid_s = pid_s.strip()
+        combo = (combo_codes[i] if i < len(combo_codes) else "").strip()
+        qty_s = (qtys[i] if i < len(qtys) else "").strip()
+        amt_s = (amounts[i] if i < len(amounts) else "").strip()
+        if not pid_s and not qty_s:
+            continue
+        if not (pid_s.isdigit() and qty_s.isdigit() and int(qty_s) > 0):
+            return None, "品項資料不完整或數量無效"
+        if combo not in UNIT_CODES:
+            return None, f"無效的品項單位：{combo}（限 片 / 盒 / 袋）"
+        amount = _parse_money(amt_s)
+        rows.append({"product_id": int(pid_s), "combo_code": combo, "qty": int(qty_s),
+                     "unit_price": amount, "subtotal": amount})
+    if not rows:
+        return None, "訂單至少需一個品項"
+    return rows, None
+
+
+@mobile_bp.route("/orders/<int:order_id>/edit", methods=["GET", "POST"])
+@role_required(*ORDER_WRITE_ROLES)
+def order_edit(order_id):
+    from blueprints.orders import (
+        perform_edit, is_order_shipped, sellable_products, validate_row_units,
+    )
+    db = get_session()
+    order = db.query(Order).filter_by(id=order_id).first()
+    if not order:
+        abort(404)
+    if order.voided_at is not None:
+        flash("此訂單已作廢，不可編輯")
+        return redirect(url_for("mobile.order_detail", order_id=order_id))
+    if is_order_shipped(db, order_id):
+        flash("此單已有出貨紀錄，品項鎖定；收件／運費／備註請到桌面版編輯")
+        return redirect(url_for("mobile.order_detail", order_id=order_id))
+
+    if request.method == "POST":
+        u = current_user()
+        operator = (u.display_name or u.username) if u else "system"
+        rows, err = _parse_edit_lines()
+        if err:
+            flash(err)
+            return redirect(url_for("mobile.order_edit", order_id=order_id))
+        unit_err = validate_row_units(db, rows)
+        if unit_err:
+            flash(unit_err)
+            return redirect(url_for("mobile.order_edit", order_id=order_id))
+        discount = _parse_money(request.form.get("discount"))
+        try:
+            ok, msg = perform_edit(db, order, rows, discount, fields=None,
+                                   operator=operator, actor_id=(u.id if u else None), via="mobile")
+            if not ok:
+                db.rollback()
+                flash(msg)
+                return redirect(url_for("mobile.order_edit", order_id=order_id))
+            db.commit()
+        except Exception as e:  # noqa: BLE001 — 任何錯誤整張 rollback（R1）
+            db.rollback()
+            flash(f"編輯失敗，已全數回復：{e}")
+            return redirect(url_for("mobile.order_edit", order_id=order_id))
+        flash(msg)
+        return redirect(url_for("mobile.order_detail", order_id=order_id))
+
+    items = db.query(OrderItem).filter_by(order_id=order_id).order_by(OrderItem.id.asc()).all()
+    return render_template(
+        "mobile/order_edit.html", section="mobile", user=current_user(),
+        order=order, products=sellable_products(db), unit_codes=UNIT_CODES,
+        edit_items=[{"product_id": it.product_id, "combo_code": it.combo_code,
+                     "qty": it.qty, "amount": ("%.0f" % float(it.subtotal or 0))} for it in items],
     )
 
 
@@ -313,6 +397,13 @@ def order_new():
 
         if not line_items:
             flash("請至少新增一個品項")
+            return _render_order_new(db)
+        # 2026-09-01：包材商品只能「袋」、面膜只能「片/盒」（與桌面同一把尺）
+        from blueprints.orders import validate_row_units
+        unit_err = validate_row_units(
+            db, [{"product_id": pid, "combo_code": combo} for pid, combo, _q, _a in line_items])
+        if unit_err:
+            flash(unit_err)
             return _render_order_new(db)
 
         # ---- §4.2：建單 + 建明細 + 逐項扣庫存，全在同一 transaction ----
@@ -411,13 +502,9 @@ def order_new():
 
 def _render_order_new(db, form=None):
     customers = db.query(Customer).order_by(Customer.name).all()
-    # 可下單品項：非包材、上架
-    products = (
-        db.query(Product)
-        .filter(Product.is_packaging == False, Product.active == True)  # noqa: E712
-        .order_by(Product.name)
-        .all()
-    )
+    # 可下單品項：上架面膜 + 上架包材（紙袋當品項，2026-09-01；與桌面 sellable_products 同源）
+    from blueprints.orders import sellable_products
+    products = sellable_products(db)
     return render_template(
         "mobile/order_new.html", section="mobile", user=current_user(),
         customers=customers, products=products,

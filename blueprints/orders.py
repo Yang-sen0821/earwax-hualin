@@ -10,8 +10,13 @@
 - 歷史訂單匯入欄位頁（欄位齊，資料後補，D14）。
 - CR-4（2026-08-31）：訂單編輯（同一 tx：reverse_sale 反沖 → 刪重建 items → 逐列 deduct_for_sale
   → 重算 total）與作廢（軟刪除 voided_at/by/reason；未出貨全額回補、已出貨不回補限 owner）；
-  兩者皆寫 audit_logs。「已出貨」判定＝shipments 有該單列（或 shipping_status 已為 shipped/delivered，
-  相容本修正前由桌面出貨、未建 shipments 列的歷史單）。
+  兩者皆寫 audit_logs。
+- CR-10（2026-09-01）：單筆訂單編輯可「新增一行／刪除一行／改數量金額」（桌面 form.html 動態列 +
+  手機簡版 /m/orders/<id>/edit）；核心抽成 perform_edit() 供桌面／手機共用；audit order_edit detail
+  另附 lines_added / lines_removed / lines_changed 摘要。
+  **「已出貨」判定改為：只有 shipments 表有該單列（真正走過出貨流程、可能扣過紙袋）才鎖品項／不回補；
+  shipping_status 為 shipped/delivered 但無 shipments 列 → 視為未出貨**（線上 51 筆歷史單全由客戶以
+  paid/delivered 直接建立、從未走出貨流程，舊規則把它們全鎖死，森哥要的加行／刪行做不到）。
 - CR-7（2026-08-31）：GET /orders/new?customer_id=<id> 預填客戶（客戶明細頁「＋ 新增訂單」入口）；
   id 不存在則忽略、照常開空白建單頁；仍可換人（沿用客戶欄打字過濾）。
 - CR-6（2026-08-31）：桌面列表勾選批次作廢（POST /orders/void-bulk）；規則完全沿用 perform_void，
@@ -60,9 +65,12 @@ PAYMENT_STATUSES = ("unpaid", "paid", "refunded", "partial")
 # CR-4：移除 cancelled（原下拉可選取消但不回補庫存的漏洞），取消一律走「作廢」流程（void）
 SHIPPING_STATUSES = ("pending", "shipped", "delivered")
 
-# 建單品項單位閉集（新模型）：LOOSE=片(扣裸片池)、BOX=盒(扣盒裝池)。
-# combo_code 欄位沿用，存 LOOSE/BOX；數量=qty，金額=unit_price/subtotal（無 schema 變更）。
-UNIT_CODES = ("LOOSE", "BOX")
+# 建單品項單位閉集（新模型）：LOOSE=片(扣裸片池)、BOX=盒(扣盒裝池)、BAG=袋(扣紙袋池，2026-09-01)。
+# combo_code 欄位沿用，存 LOOSE/BOX/BAG；數量=qty，金額=unit_price/subtotal（無 schema 變更）。
+# 面膜商品只能選 片/盒；包材商品（is_packaging）只能選 袋 —— 由 validate_row_units 在後端擋。
+UNIT_CODES = ("LOOSE", "BOX", "BAG")
+MASK_UNIT_CODES = ("LOOSE", "BOX")
+BAG_UNIT_CODES = ("BAG",)
 
 # 運送方式閉集（CR-5 2026-08-31）；中文由 display_labels.shipping_method_label
 SHIPPING_METHODS = ("711", "post", "pickup", "other")
@@ -147,7 +155,7 @@ def new():
     return render_template(
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
-        products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
+        products=sellable_products(db),
         unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
         form=_prefill_customer_form(db, request.args.get("customer_id")),
     )
@@ -213,7 +221,7 @@ def _create_order(db):
         flash(ship_err)
         return _redraw_form(db)
 
-    rows, item_err = _parse_items()
+    rows, item_err = _parse_items(db)
     if item_err:
         flash(item_err)
         return _redraw_form(db)
@@ -696,7 +704,7 @@ def _redraw_form(db):
     return render_template(
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
-        products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
+        products=sellable_products(db),
         unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
         form=request.form,
     )
@@ -769,23 +777,53 @@ def _result_ok(result):
 # =========================================================================
 # CR-4（2026-08-31）訂單編輯 / 作廢
 # =========================================================================
+def has_shipment_record(db, order_id):
+    """shipments 表是否有該單列（桌面 update_shipping 轉 shipped／手機 ship_order 皆建）。"""
+    return db.query(Shipment.id).filter_by(order_id=order_id).first() is not None
+
+
 def is_order_shipped(db, order_id):
-    """「已出貨」判定：shipments 有該單列（桌面/手機出貨皆建）。
+    """「已出貨」判定（CR-10 改規則）：**只看 shipments 表有沒有該單列**。
 
-    相容：本修正前由桌面 update_shipping 出貨的歷史單沒有 shipments 列，
-    故 shipping_status 已為 shipped/delivered 也視為已出貨（寧嚴勿鬆：已出貨單不可重扣/回補）。
+    有列 = 真正走過出貨流程（可能已扣紙袋）→ 編輯時品項鎖定、作廢不回補且限 owner。
+    無列 = 視為未出貨，即使 shipping_status 已是 shipped/delivered（客戶直接以 delivered 建單的歷史單、
+    手機「僅改狀態旗標」的單）→ 可正常反沖→重建→重扣、可回補作廢。
+    舊規則（狀態 shipped/delivered 亦鎖）已移除：線上全部訂單都被鎖死，加行／刪行做不到。
     """
-    if db.query(Shipment.id).filter_by(order_id=order_id).first() is not None:
-        return True
-    o = db.get(Order, order_id)
-    return bool(o and o.shipping_status in ("shipped", "delivered"))
+    return has_shipment_record(db, order_id)
 
 
-def _parse_items():
+def sellable_products(db):
+    """建單／編輯頁商品下拉：上架面膜商品 + 上架包材商品（紙袋當品項，2026-09-01）。面膜排前、包材排後。"""
+    prods = db.query(Product).filter_by(active=True).order_by(Product.id.asc()).all()
+    return [p for p in prods if not p.is_packaging] + [p for p in prods if p.is_packaging]
+
+
+def validate_row_units(db, rows):
+    """商品 × 單位 合法性（桌面／手機建單與編輯共用）：包材商品只能 BAG(袋)，面膜商品只能 LOOSE/BOX。
+
+    rows：dict list，至少含 product_id / combo_code。回錯誤字串或 None。
+    """
+    ids = {int(r["product_id"]) for r in rows}
+    prods = {p.id: p for p in db.query(Product).filter(Product.id.in_(ids)).all()} if ids else {}
+    for r in rows:
+        p = prods.get(int(r["product_id"]))
+        if p is None or not p.active:
+            return f"商品不存在或已下架：#{r['product_id']}"
+        combo = r["combo_code"]
+        if p.is_packaging and combo not in BAG_UNIT_CODES:
+            return f"{p.name} 為包材，單位只能選「袋」"
+        if not p.is_packaging and combo in BAG_UNIT_CODES:
+            return f"{p.name} 不是包材，不能以「袋」為單位"
+    return None
+
+
+def _parse_items(db=None):
     """解析多品項平行陣列 → (rows, error)。建單與編輯共用。
 
-    combo_codes 存單位值 LOOSE/BOX；amounts = 該列實收金額（直接金額，非單價×數量）；
+    combo_codes 存單位值 LOOSE/BOX/BAG；amounts = 該列實收金額（直接金額，非單價×數量）；
     unit_price 與 subtotal 同存此金額（無 schema 變更）。
+    有給 db 時另做 validate_row_units（包材只能袋、面膜只能片/盒）。
     """
     product_ids = request.form.getlist("item_product_id")
     combo_codes = request.form.getlist("item_combo_code")
@@ -801,13 +839,17 @@ def _parse_items():
         if not pid or not combo:
             continue
         if combo not in UNIT_CODES:
-            return None, f"無效的品項單位：{combo}（限 片 / 盒）"
+            return None, f"無效的品項單位：{combo}（限 片 / 盒 / 袋）"
         if not qty or qty <= 0:
             return None, "品項數量必須為正整數"
         rows.append({"product_id": pid, "combo_code": combo, "qty": qty,
                      "unit_price": amount, "subtotal": amount})
     if not rows:
         return None, "訂單至少需一個品項"
+    if db is not None:
+        unit_err = validate_row_units(db, rows)
+        if unit_err:
+            return None, unit_err
     return rows, None
 
 
@@ -904,31 +946,164 @@ def _edit_form_dict(db, order):
     }
 
 
+def _items_from_form():
+    """POST 驗證失敗重繪編輯頁時，品項列以剛送出的表單為準（不是 DB 舊值），使用者不必重打。"""
+    pids = request.form.getlist("item_product_id")
+    combos = request.form.getlist("item_combo_code")
+    qtys = request.form.getlist("item_qty")
+    amts = request.form.getlist("item_amount")
+    out = []
+    for i, pid in enumerate(pids):
+        out.append({
+            "product_id": _to_int(pid),
+            "combo_code": (combos[i] if i < len(combos) else ""),
+            "qty": _to_int(qtys[i] if i < len(qtys) else None) or 1,
+            "amount": (amts[i] if i < len(amts) else "0") or "0",
+        })
+    return out
+
+
 def _render_edit(db, order, form=None):
+    from_form = form is not None
     items = db.query(OrderItem).filter_by(order_id=order.id).order_by(OrderItem.id.asc()).all()
+    edit_items = (_items_from_form() if from_form else
+                  [{"product_id": it.product_id, "combo_code": it.combo_code,
+                    "qty": it.qty, "amount": str(it.subtotal or 0)} for it in items])
     return render_template(
         "orders/form.html", section="orders",
         customers=db.query(Customer).order_by(Customer.name.asc()).all(),
-        products=db.query(Product).filter_by(active=True, is_packaging=False).all(),
+        products=sellable_products(db),
         unit_codes=UNIT_CODES, shipping_methods=SHIPPING_METHODS,
-        form=(form if form is not None else _edit_form_dict(db, order)),
+        form=(form if from_form else _edit_form_dict(db, order)),
         edit_order=order,
-        edit_items=[{"product_id": it.product_id, "combo_code": it.combo_code,
-                     "qty": it.qty, "amount": str(it.subtotal or 0)} for it in items],
+        edit_items=edit_items,
         items_locked=is_order_shipped(db, order.id),
         form_action=url_for("orders.edit", order_id=order.id),
     )
 
 
+def _lines_diff(db, before_items, after_rows):
+    """CR-10：比對編輯前後品項列，回 (lines_added, lines_removed, lines_changed)。
+
+    以 (product_id, combo_code) 為列身分、同身分依出現順序配對：
+      只在後 → 新增；只在前 → 刪除；兩邊都有但 qty 或 subtotal 不同 → 修改（含 before/after）。
+    每列附 product_name，供操作紀錄頁人話摘要。
+    """
+    def key(r):
+        return (int(r["product_id"]), str(r["combo_code"]))
+
+    def norm_amt(v):
+        try:
+            return Decimal(str(v if v is not None else 0))
+        except (InvalidOperation, ValueError):
+            return Decimal("0")
+
+    def line(r):
+        return {"product_id": r["product_id"],
+                "product_name": _product_label(db, r["product_id"]),
+                "combo_code": r["combo_code"], "qty": r["qty"],
+                "subtotal": norm_amt(r.get("subtotal"))}
+
+    before_by = {}
+    for r in before_items:
+        before_by.setdefault(key(r), []).append(r)
+    added, removed, changed = [], [], []
+    for r in after_rows:
+        pool = before_by.get(key(r))
+        if pool:
+            b = pool.pop(0)
+            if int(b["qty"]) != int(r["qty"]) or norm_amt(b.get("subtotal")) != norm_amt(r.get("subtotal")):
+                changed.append({**line(r), "qty_before": b["qty"], "qty_after": r["qty"],
+                                "subtotal_before": norm_amt(b.get("subtotal")),
+                                "subtotal_after": norm_amt(r.get("subtotal"))})
+        else:
+            added.append(line(r))
+    for pool in before_by.values():
+        for b in pool:
+            removed.append(line(b))
+    return added, removed, changed
+
+
+def perform_edit(db, order, rows, discount, fields, operator, actor_id, via=None):
+    """訂單編輯核心（CR-10 抽出；桌面 edit / 手機 order_edit 共用）。同一 tx，呼叫端 commit/rollback。
+
+    rows     ：新品項列（_parse_items 格式 dict list）；品項鎖定（有出貨紀錄）時傳 None → 不動 items / 庫存 / 折扣。
+    discount ：新折扣（Decimal）；rows 為 None 時忽略。
+    fields   ：要更新的欄位 dict（customer_id / recipient_name / recipient_phone / shipping_address /
+               note / shipping_fee / shipping_method / shipping_note），只更新有給的鍵；None 或 {} = 不動。
+    流程（R1）：reverse_sale 整單反沖 → 刪舊 order_items → 重建 → 逐列 deduct_for_sale → 重算 total
+              → 更新欄位 → AuditLog(order_edit，含 lines_added/removed/changed)。
+    回 (ok, message)；失敗時呼叫端 rollback（本函式不 rollback、不 commit）。
+    """
+    locked = is_order_shipped(db, order.id)
+    if locked:
+        rows = None
+    before = _order_snapshot(db, order)
+    reversal_ids, sale_ids = [], []
+    added, removed, changed = [], [], []
+
+    if rows is not None:
+        rv = inventory_service.reverse_sale(
+            db, order.id, operator=operator, actor_id=actor_id, reason="order_edit")
+        if not _result_ok(rv):
+            return False, f"編輯失敗（庫存回補被拒）：{getattr(rv, 'error', '')}"
+        reversal_ids = list(getattr(rv, "movement_ids", []) or [])
+
+        added, removed, changed = _lines_diff(db, before["items"], rows)
+        db.query(OrderItem).filter_by(order_id=order.id).delete(synchronize_session=False)
+        db.flush()
+        for r in rows:
+            db.add(OrderItem(
+                order_id=order.id, product_id=r["product_id"],
+                combo_code=r["combo_code"], qty=r["qty"],
+                unit_price=r["unit_price"], subtotal=r["subtotal"],
+            ))
+        db.flush()
+        for r in rows:
+            result = inventory_service.deduct_for_sale(
+                db, product_id=r["product_id"], combo_code=r["combo_code"],
+                order_qty=r["qty"], operator=operator, order_ref=str(order.id),
+                note=f"order {order.order_no}（編輯重扣）",
+            )
+            if not _result_ok(result):
+                # 任一缺貨 ⇒ 呼叫端整張 rollback（含反沖），餘量不變
+                pname = _product_label(db, r["product_id"])
+                return False, (f"庫存不足，編輯未儲存（已全數回復）：{pname} / "
+                               f"{combo_label(r['combo_code'])} × {r['qty']}")
+            sale_ids.extend(getattr(result, "movement_ids", []) or [])
+        if discount is None or discount < 0:
+            discount = Decimal("0")
+        order.discount = discount
+        order.total_amount = _calc_total(rows, discount)
+
+    for k, v in (fields or {}).items():
+        setattr(order, k, v)
+    order.updated_by = actor_id
+    db.flush()
+
+    after = _order_snapshot(db, order)
+    detail = {
+        "before": before, "after": after, "items_locked": locked,
+        "lines_added": added, "lines_removed": removed, "lines_changed": changed,
+        "reversal_movement_ids": reversal_ids, "sale_movement_ids": sale_ids,
+    }
+    if via:
+        detail["via"] = via
+    _audit(db, "order_edit", order.id, detail)
+    msg = "訂單已更新" + ("（有出貨紀錄：品項鎖定，僅更新收件/運費/備註）" if locked
+                          else "（庫存已依新品項重算）")
+    return True, msg
+
+
 @orders_bp.route("/<int:order_id>/edit", methods=["GET", "POST"])
 @role_required(*WRITE_ROLES)
 def edit(order_id):
-    """編輯訂單（staff + owner）。
+    """編輯訂單（staff + owner）。核心走 perform_edit（CR-10 抽出，手機共用）。
 
-    未出貨：同一 tx「reverse_sale 反沖 → 刪舊 order_items → 依表單重建 → 逐列 deduct_for_sale
-            → 重算 total_amount（Σsubtotal − 折扣）→ 更新收件/備註/運費/方式 → AuditLog(order_edit)」；
+    未出貨（shipments 無列）：同一 tx「reverse_sale 反沖 → 刪舊 order_items → 依表單重建（可新增／刪除列）
+            → 逐列 deduct_for_sale → 重算 total_amount → 更新收件/備註/運費/方式 → AuditLog(order_edit)」；
             任一缺貨整張 rollback。
-    已出貨（shipments 有列）：品項與折扣鎖定，只改備註／運費／運送方式／收件資訊，不動庫存。
+    有出貨紀錄（shipments 有列）：品項與折扣鎖定，只改備註／運費／運送方式／收件資訊，不動庫存。
     """
     db = get_session()
     order = db.get(Order, order_id)
@@ -942,10 +1117,12 @@ def edit(order_id):
         return _render_edit(db, order)
 
     locked = is_order_shipped(db, order_id)
-    operator = _operator_name()
 
     # ---- 1. 解析表單 ----
-    customer_id = _to_int(request.form.get("customer_id"))
+    # 客戶欄：表單有帶 customer_id（含空字串＝明確清除）才改；完全沒帶（簡版／程式化 POST）則保留原客戶，
+    # 避免一次品項編輯把訂單從客戶名單裡弄丟（CR-10）。
+    customer_id = (_to_int(request.form.get("customer_id"))
+                   if "customer_id" in request.form else order.customer_id)
     new_customer_name = (request.form.get("new_customer_name") or "").strip()
     if customer_id:
         new_customer_name = ""
@@ -962,81 +1139,43 @@ def edit(order_id):
         return _render_edit(db, order, form=request.form)
 
     rows = None
-    discount = order.discount or Decimal("0")
+    discount = None
     if not locked:
         discount = _to_decimal(request.form.get("discount"), default=0)
-        if discount < 0:
-            discount = Decimal("0")
-        rows, item_err = _parse_items()
+        rows, item_err = _parse_items(db)
         if item_err:
             flash(item_err)
             return _render_edit(db, order, form=request.form)
 
     # ---- 2. 同一原子 tx（R1）----
-    before = _order_snapshot(db, order)
-    reversal_ids = []
-    sale_ids = []
     try:
-        customer_id, created_customer = _resolve_customer(
+        customer_id, _created = _resolve_customer(
             db, customer_id, new_customer_name, recipient_phone)
-
-        if not locked:
-            rv = inventory_service.reverse_sale(
-                db, order.id, operator=operator, actor_id=_uid(), reason="order_edit")
-            if not _result_ok(rv):
-                db.rollback()
-                flash(f"編輯失敗（庫存回補被拒）：{getattr(rv, 'error', '')}")
-                return redirect(url_for("orders.edit", order_id=order_id))
-            reversal_ids = list(getattr(rv, "movement_ids", []) or [])
-
-            db.query(OrderItem).filter_by(order_id=order.id).delete(synchronize_session=False)
-            db.flush()
-            for r in rows:
-                db.add(OrderItem(
-                    order_id=order.id, product_id=r["product_id"],
-                    combo_code=r["combo_code"], qty=r["qty"],
-                    unit_price=r["unit_price"], subtotal=r["subtotal"],
-                ))
-            db.flush()
-            for r in rows:
-                result = inventory_service.deduct_for_sale(
-                    db, product_id=r["product_id"], combo_code=r["combo_code"],
-                    order_qty=r["qty"], operator=operator, order_ref=str(order.id),
-                    note=f"order {order.order_no}（編輯重扣）",
-                )
-                if not _result_ok(result):
-                    db.rollback()   # 任一缺貨 ⇒ 整張 rollback（含反沖），餘量不變
-                    pname = _product_label(db, r["product_id"])
-                    flash(f"庫存不足，編輯未儲存（已全數回復）：{pname} / "
-                          f"{combo_label(r['combo_code'])} × {r['qty']}")
-                    return redirect(url_for("orders.edit", order_id=order_id))
-                sale_ids.extend(getattr(result, "movement_ids", []) or [])
-            order.discount = discount
-            order.total_amount = _calc_total(rows, discount)
-
-        order.customer_id = customer_id
-        order.recipient_name = recipient_name or None
-        order.recipient_phone = recipient_phone or None
-        order.shipping_address = shipping_address or None
-        order.note = note
-        order.shipping_fee = ship_fields["shipping_fee"]
-        order.shipping_method = ship_fields["shipping_method"]
-        order.shipping_note = ship_fields["shipping_note"]
-        order.updated_by = _uid()
-        db.flush()
-
-        after = _order_snapshot(db, order)
-        _audit(db, "order_edit", order.id, {
-            "before": before, "after": after, "items_locked": locked,
-            "reversal_movement_ids": reversal_ids, "sale_movement_ids": sale_ids,
-        })
+        ok, msg = perform_edit(
+            db, order, rows, discount,
+            fields={
+                "customer_id": customer_id,
+                "recipient_name": recipient_name or None,
+                "recipient_phone": recipient_phone or None,
+                "shipping_address": shipping_address or None,
+                "note": note,
+                "shipping_fee": ship_fields["shipping_fee"],
+                "shipping_method": ship_fields["shipping_method"],
+                "shipping_note": ship_fields["shipping_note"],
+            },
+            operator=_operator_name(), actor_id=_uid(),
+        )
+        if not ok:
+            db.rollback()
+            flash(msg)
+            return redirect(url_for("orders.edit", order_id=order_id))
         db.commit()
     except Exception as exc:  # noqa: BLE001 — 任何異動失敗整張 rollback（R1）
         db.rollback()
         flash(f"編輯失敗，已全數回復：{exc}")
         return redirect(url_for("orders.edit", order_id=order_id))
 
-    flash("訂單已更新" + ("（已出貨單：品項鎖定，僅更新收件/運費/備註）" if locked else "（庫存已依新品項重算）"))
+    flash(msg)
     return redirect(url_for("orders.detail", order_id=order_id))
 
 
@@ -1084,7 +1223,7 @@ def perform_void(db, order, reason, operator, actor_id, actor_name, extra_detail
     write_audit(db, "order_void", "orders", order.id, detail,
                 actor_id=actor_id, actor_name=actor_name)
     msg = f"訂單 {order.order_no} 已作廢" + (
-        "（已出貨單：庫存不回補）" if shipped else "（庫存已回補）")
+        "（已有出貨紀錄：庫存不回補）" if shipped else "（庫存已回補）")
     if old_pay == "paid":
         msg += "；付款狀態改為已退款"
     return True, msg
@@ -1172,7 +1311,7 @@ def void_bulk():
     if not is_owner:
         blocked = [o.order_no for o in targets if shipped_map[o.id]]
         if blocked:
-            flash("以下訂單已出貨，作廢需由老闆（owner）操作，整批未執行："
+            flash("以下訂單已出貨（有出貨紀錄），作廢需由老闆（owner）操作，整批未執行："
                   + "、".join(blocked))
             return back
 

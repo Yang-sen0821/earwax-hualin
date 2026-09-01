@@ -80,6 +80,10 @@ _COMBO_MAP = {
 _UNIT_MAP = {
     "LOOSE": ("loose_piece", 1),
     "BOX":   ("boxed", 1),
+    # 2026-09-01（森哥「訂單建立也要能選擇紙袋當品項」）：BAG(袋) → 紙袋池 × 數量，
+    # 掛 sentinel 共用包材商品（PKG-SHARED-001）。走同一 SALE / SALE_REVERSAL 契約，
+    # 故 CR-9 歷史輸入／已消耗會把紙袋銷售一併算成消耗；編輯／作廢的 reverse_sale 同樣回補。
+    "BAG":   ("paper_bag", 1),
 }
 
 
@@ -248,7 +252,8 @@ def deduct_for_sale(session, product_id, combo_code, order_qty,
     """銷售扣減（§4.1）。
 
     新模型「單位 + 數量」（建單只用這兩個）：
-      LOOSE(片) → 扣裸片池 × order_qty、BOX(盒) → 扣盒裝池 × order_qty。
+      LOOSE(片) → 扣裸片池 × order_qty、BOX(盒) → 扣盒裝池 × order_qty、
+      BAG(袋) → 扣紙袋池 × order_qty（product 為 sentinel 共用包材商品）。
     舊 4-combo 相容（歷史 / 既有呼叫）：
       SINGLE→(loose_piece,1)/BOX1→(boxed,1)/BOX3→(boxed,3)/BOX10→(boxed,10)。
     只讀 normal，永不觸 reserved/pr/trial/scrap；兩池不互換（R1 紅線不變）。

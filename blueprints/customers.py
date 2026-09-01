@@ -140,11 +140,17 @@ def detail(customer_id):
     orders, items_map = customer_orders_with_items(
         db, customer_id, include_voided=show_voided)
     summary = customer_summary(orders)
+    # CR-10：每筆訂單列加「明細／編輯」快捷；編輯只給 staff/owner 且該單無出貨紀錄（品項才可增刪）
+    from blueprints.orders import is_order_shipped
+    shipped_map = {o.id: is_order_shipped(db, o.id) for o in orders}
+    u = current_user()
+    can_edit_orders = bool(u and (u.role == "owner" or u.role in WRITE_ROLES))
     return render_template(
         "customers/detail.html", section="customers",
         customer=customer, addresses=addresses, orders=orders,
         items_map=items_map, summary=summary,
         show_voided=show_voided, show_amount=can_see_amount(),
+        shipped_map=shipped_map, can_edit_orders=can_edit_orders,
     )
 
 

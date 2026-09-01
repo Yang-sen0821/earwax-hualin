@@ -110,6 +110,7 @@
         {% endif %}
         <th style="padding:8px;">付款</th>
         <th style="padding:8px;">出貨</th>
+        <th style="padding:8px;"></th>
       </tr>
     </thead>
     <tbody>
@@ -124,9 +125,16 @@
         {% endif %}
         <td style="padding:8px;">{{ o.payment_status | payment_label }}</td>
         <td style="padding:8px;">{{ o.shipping_status | shipping_label }}</td>
+        {# CR-10：每列快捷 — 明細一律可點；「編輯」給 staff/owner 且非作廢、無出貨紀錄（可新增／刪除品項行） #}
+        <td style="padding:8px;white-space:nowrap;text-decoration:none;">
+          <a href="{{ url_for('orders.detail', order_id=o.id) }}" style="color:var(--fc);text-decoration:none;">明細</a>
+          {% if can_edit_orders and not o.voided_at and not shipped_map.get(o.id) %}
+          　<a href="{{ url_for('orders.edit', order_id=o.id) }}" class="order-edit-link" style="color:var(--fc);text-decoration:none;font-weight:600;">編輯</a>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="{{ 7 if show_amount else 5 }}" class="muted" style="padding:12px;text-align:center;">尚無訂單</td></tr>
+      <tr><td colspan="{{ 8 if show_amount else 6 }}" class="muted" style="padding:12px;text-align:center;">尚無訂單</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -20,9 +20,15 @@
 <div class="card"{% if is_voided %} style="color:#8a8378;"{% endif %}>
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <h2 style="margin:0;flex:1;">訂單 {{ order.order_no }}{% if is_voided %} <span style="font-size:14px;color:#a33;">（{{ VOIDED_LABEL }}）</span>{% endif %}</h2>
+    {# CR-10：編輯入口明顯化；無出貨紀錄可新增／刪除品項行，有出貨紀錄只改收件/運費/備註 #}
     {% if not is_voided and can_write %}
+    {% if is_shipped %}
     <a href="{{ url_for('orders.edit', order_id=order.id) }}"
-       style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">編輯{{ '（僅收件/運費/備註）' if is_shipped }}</a>
+       style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);">編輯（僅收件/運費/備註）</a>
+    {% else %}
+    <a href="{{ url_for('orders.edit', order_id=order.id) }}" id="edit-order-btn"
+       style="padding:8px 14px;background:var(--fc);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">編輯訂單（新增／刪除品項）</a>
+    {% endif %}
     {% endif %}
     <a href="{{ url_for('orders.index') }}" style="color:var(--fc);text-decoration:none;">← 返回列表</a>
   </div>
@@ -101,7 +107,7 @@
 <div class="card" style="margin-top:16px;border:1px solid #d9b0b0;">
   <h3 style="margin-top:0;color:#a33;">作廢訂單</h3>
   <p class="muted" style="font-size:13px;">
-    {% if is_shipped %}此單已出貨：作廢後<strong>不回補庫存</strong>（貨與袋已出門，退貨另走入庫），不計入統計；已付款會改為已退款。
+    {% if is_shipped %}此單已有出貨紀錄：作廢後<strong>不回補庫存</strong>（貨與袋已出門，退貨另走入庫），不計入統計；已付款會改為已退款。
     {% else %}作廢後品項庫存<strong>全額回補</strong>至可售池、不計入任何統計；已付款會改為已退款。原始明細與收款/出貨紀錄保留供查。{% endif %}
   </p>
   <form method="post" action="{{ url_for('orders.void', order_id=order.id) }}" style="display:flex;gap:8px;flex-wrap:wrap;"
@@ -111,7 +117,7 @@
   </form>
 </div>
 {% elif is_shipped and can_write %}
-<p class="muted" style="margin-top:16px;font-size:13px;">此單已出貨，作廢需由老闆（owner）操作。</p>
+<p class="muted" style="margin-top:16px;font-size:13px;">此單已有出貨紀錄，作廢需由老闆（owner）操作。</p>
 {% endif %}
 {% endif %}
 {% endblock %}

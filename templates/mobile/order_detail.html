@@ -51,6 +51,15 @@
       <div class="ttl2">${{ '%.0f'|format(order.shipping_fee or 0) }}</div></div>
     <div class="row"><div class="grow"><div class="ttl2">應收合計</div></div>
       <div class="big">${{ '%.0f'|format((order.total_amount or 0) + (order.shipping_fee or 0)) }}</div></div>
+    {# CR-10：手機簡版編輯（新增一行／刪除一行／改數量金額）；有出貨紀錄則品項鎖定、導到桌面版改收件/運費 #}
+    {% if not is_voided and can_edit %}
+      {% if not is_shipped %}
+      <a href="/m/orders/{{ order.id }}/edit" class="btn btn-primary" style="text-decoration:none;margin-top:8px;">編輯品項（新增／刪除一行）</a>
+      {% else %}
+      <div class="hint">此單已有出貨紀錄，品項鎖定；收件／運費／備註請到桌面版編輯。</div>
+      {% endif %}
+      <a href="/orders/{{ order.id }}/edit" class="btn btn-ghost" style="text-decoration:none;margin-top:6px;">到桌面版完整編輯</a>
+    {% endif %}
   </div>
 
   {% if not is_voided %}
@@ -80,7 +89,7 @@
   <div class="card" style="border:1px solid #f0caca;">
     <h3 style="color:var(--warn);">作廢訂單</h3>
     <div class="hint" style="margin-top:0;">
-      {% if is_shipped %}已出貨單：作廢後不回補庫存、不計入統計；已付款改為已退款。
+      {% if is_shipped %}已有出貨紀錄：作廢後不回補庫存、不計入統計；已付款改為已退款。
       {% else %}作廢後品項庫存全額回補、不計入統計；已付款改為已退款。明細與紀錄保留。{% endif %}
     </div>
     <form method="post" action="/m/orders/{{ order.id }}/void"
@@ -92,7 +101,7 @@
     </form>
   </div>
   {% elif is_shipped %}
-  <div class="hint">此單已出貨，作廢需由老闆（owner）操作。</div>
+  <div class="hint">此單已有出貨紀錄，作廢需由老闆（owner）操作。</div>
   {% endif %}
   {% endif %}
 {% endblock %}

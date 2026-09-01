@@ -1,0 +1,92 @@
+{% extends "mobile/_base.html" %}
+{% block title %}編輯品項 {{ order.order_no }}{% endblock %}
+{% block heading %}編輯品項 {{ order.order_no }}{% endblock %}
+{% block back %}<a href="/m/orders/{{ order.id }}" class="back">‹</a>{% endblock %}
+{% set active_tab = 'orders' %}
+{% block content %}
+  {# CR-10 手機簡版編輯：新增一行／刪除一行／改數量金額／折扣。收件、運費、備註請到桌面版。
+     儲存走 blueprints.orders.perform_edit：同一交易「整單反沖 → 重建 → 重扣」，任一缺貨整張不變。 #}
+  <div class="hint" style="margin-bottom:8px;">可新增一行、刪除某行、改數量與金額；儲存時先回補原品項再重扣，缺貨整張不變。收件／運費／備註請<a href="/orders/{{ order.id }}/edit">到桌面版</a>改。</div>
+  <form method="post" action="/m/orders/{{ order.id }}/edit" onsubmit="return checkLines()">
+    <div class="card">
+      <h3>品項</h3>
+      <div class="item-line edit-line" style="font-size:12px;color:var(--soft)">
+        <div>商品</div><div>片/盒/袋</div><div>數量</div><div>金額</div><div></div>
+      </div>
+      <div id="lines">
+        {% for it in edit_items %}
+        <div class="item-line edit-line">
+          <select name="product_id" onchange="syncUnit(this)">
+            {% for p in products %}
+            <option value="{{ p.id }}" data-pkg="{{ '1' if p.is_packaging else '0' }}" {{ 'selected' if p.id == it.product_id }}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <select name="combo_code">
+            {% for cc in unit_codes %}
+            <option value="{{ cc }}" data-bag="{{ '1' if cc == 'BAG' else '0' }}" {{ 'selected' if cc == it.combo_code }}>{{ cc | combo_label }}</option>
+            {% endfor %}
+          </select>
+          <input type="number" name="qty" min="1" inputmode="numeric" value="{{ it.qty }}">
+          <input type="number" name="amount" min="0" step="0.01" inputmode="decimal" value="{{ it.amount }}">
+          <button type="button" class="rm" onclick="removeLine(this)" aria-label="刪除此行">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-ghost btn-line" onclick="addLine()">＋ 新增一行</button>
+      <label style="margin-top:10px;">折扣金額</label>
+      <input type="number" name="discount" min="0" step="0.01" inputmode="decimal" value="{{ '%.0f'|format(order.discount or 0) }}">
+      <div class="hint">刪除整張請用明細頁「作廢」；此處至少保留一行。</div>
+    </div>
+    <button class="btn btn-primary" type="submit">儲存變更（重算庫存）</button>
+  </form>
+
+  <template id="line-tpl">
+    <div class="item-line edit-line">
+      <select name="product_id" onchange="syncUnit(this)">
+        {% for p in products %}<option value="{{ p.id }}" data-pkg="{{ '1' if p.is_packaging else '0' }}">{{ p.name }}</option>{% endfor %}
+      </select>
+      <select name="combo_code">
+        {% for cc in unit_codes %}<option value="{{ cc }}" data-bag="{{ '1' if cc == 'BAG' else '0' }}">{{ cc | combo_label }}</option>{% endfor %}
+      </select>
+      <input type="number" name="qty" min="1" inputmode="numeric" value="1">
+      <input type="number" name="amount" min="0" step="0.01" inputmode="decimal" value="0">
+      <button type="button" class="rm" onclick="removeLine(this)" aria-label="刪除此行">✕</button>
+    </div>
+  </template>
+  <style>
+    .edit-line { grid-template-columns: 1.3fr 0.7fr 52px 72px 28px; }
+    .edit-line .rm { border:none; background:none; color:var(--warn); font-size:18px; padding:0; cursor:pointer; }
+  </style>
+  <script>
+    function addLine(){
+      var t=document.getElementById('line-tpl');
+      document.getElementById('lines').appendChild(t.content.cloneNode(true));
+      var lines=document.querySelectorAll('#lines .item-line');
+      syncUnit(lines[lines.length-1].querySelector('select[name="product_id"]'));
+    }
+    function removeLine(btn){
+      var lines=document.querySelectorAll('#lines .item-line');
+      if(lines.length<=1){alert('至少保留一行品項；要取消整張請用「作廢」。');return;}
+      btn.closest('.item-line').remove();
+    }
+    function checkLines(){
+      return document.querySelectorAll('#lines .item-line').length>=1;
+    }
+    // 換商品：包材只留「袋」且金額歸 0；面膜只留「片/盒」
+    function syncUnit(sel){
+      var line=sel.closest('.item-line');
+      var opt=sel.options[sel.selectedIndex];
+      var pkg=opt && opt.getAttribute('data-pkg')==='1';
+      var unit=line.querySelector('select[name="combo_code"]');
+      var first=null;
+      Array.prototype.forEach.call(unit.options,function(o){
+        var isBag=o.getAttribute('data-bag')==='1';
+        var show=pkg?isBag:!isBag;
+        o.hidden=!show; o.disabled=!show;
+        if(show&&first===null){first=o.value;}
+      });
+      if(unit.selectedOptions.length===0||unit.selectedOptions[0].disabled){unit.value=first;}
+    }
+    document.querySelectorAll('#lines select[name="product_id"]').forEach(syncUnit);
+  </script>
+{% endblock %}

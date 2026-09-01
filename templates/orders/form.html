@@ -7,12 +7,13 @@
   <h2 style="margin-top:0;">{% if is_edit %}編輯訂單 {{ edit_order.order_no }}{% else %}新增訂單{% endif %}</h2>
   {% if locked %}
   {# CR-4：已出貨單品項與折扣鎖定，只能改收件 / 運費 / 運送方式 / 備註，不重扣庫存 #}
-  <p style="margin-top:0;color:#8a6d00;background:#fff7e6;border:1px solid #f0dcb9;border-radius:8px;padding:8px 12px;">此單已出貨：品項與折扣鎖定，僅可修改收件資訊、運費、運送方式與備註（不動庫存）。</p>
+  <p style="margin-top:0;color:#8a6d00;background:#fff7e6;border:1px solid #f0dcb9;border-radius:8px;padding:8px 12px;">此單已有出貨紀錄：品項與折扣鎖定，僅可修改收件資訊、運費、運送方式與備註（不動庫存）。</p>
   {% elif is_edit %}
-  <p class="muted" style="margin-top:0;">儲存時系統在同一交易內先回補原品項庫存、再依新品項重新扣減；任一品項缺貨則整張不變。</p>
+  {# CR-10：品項列可「＋ 新增一行」「移除」；儲存時整單反沖 → 重建 → 重扣，任一缺貨整張不變 #}
+  <p class="muted" style="margin-top:0;">可新增一行、移除某行、改數量與金額。儲存時系統在同一交易內先回補原品項庫存、再依新品項重新扣減；任一品項缺貨則整張不變。</p>
   {% endif %}
   <p class="muted" style="margin-top:0;">類型：<b>面膜</b>｜<a href="{{ url_for('earwax_sales.new') }}">愛啪啪</a>（愛啪啪走獨立紀錄，不進面膜報表）</p>
-  <p class="muted" style="margin-top:0;">多品項可逐列新增；任一品項庫存不足，整張訂單不會建立（同一交易，§4.2）。</p>
+  <p class="muted" style="margin-top:0;">多品項可逐列新增；任一品項庫存不足，整張訂單不會建立（同一交易，§4.2）。紙袋可當品項（商品選「包材-共用」、單位「袋」、金額預設 0），扣紙袋庫存。</p>
 
   {% with messages = get_flashed_messages() %}
     {% if messages %}
@@ -86,7 +87,7 @@
       </tbody>
     </table>
     {% if not locked %}
-    <button type="button" onclick="addRow()" style="margin-top:8px;padding:6px 14px;border:1px dashed var(--fc);border-radius:8px;background:#fff;color:var(--fc);cursor:pointer;">+ 新增品項</button>
+    <button type="button" id="add-row-btn" onclick="addRow()" style="margin-top:8px;padding:6px 14px;border:1px dashed var(--fc);border-radius:8px;background:#fff;color:var(--fc);cursor:pointer;">+ 新增品項（新增一行）</button>
     {% endif %}
 
     <label style="display:block;margin-top:16px;">訂單備註
@@ -101,29 +102,60 @@
 </div>
 
 <script>
-  var PRODUCTS = [{% for p in products %}{id:{{ p.id }}, name:{{ p.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
-  // 品項只有兩種單位：片 / 盒（值存 LOOSE / BOX）
+  // pkg=true 為包材商品（紙袋當品項，2026-09-01）：單位只給「袋」、金額預設 0
+  var PRODUCTS = [{% for p in products %}{id:{{ p.id }}, name:{{ p.name|tojson }}, pkg:{{ 'true' if p.is_packaging else 'false' }}}{{ ',' if not loop.last }}{% endfor %}];
+  // 單位：片 / 盒（面膜）、袋（包材）（值存 LOOSE / BOX / BAG）
   var UNITS = [{% for c in unit_codes %}{code:{{ c|tojson }}, name:{{ (c|combo_label)|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
+  var BAG_CODES = ['BAG'];
 
-  // 編輯模式預填（CR-4）；LOCKED=已出貨單品項唯讀
+  // 編輯模式預填（CR-4）；LOCKED=有出貨紀錄的單品項唯讀
   var INIT_ITEMS = {{ (edit_items if is_edit else [])|tojson }};
   var LOCKED = {{ 'true' if locked else 'false' }};
+
+  function productById(id) {
+    for (var i = 0; i < PRODUCTS.length; i++) { if (PRODUCTS[i].id == id) { return PRODUCTS[i]; } }
+    return PRODUCTS[0] || null;
+  }
+  function unitsFor(prod) {
+    var pkg = !!(prod && prod.pkg);
+    return UNITS.filter(function(c){ return pkg ? BAG_CODES.indexOf(c.code) >= 0 : BAG_CODES.indexOf(c.code) < 0; });
+  }
+  function unitOptionsHtml(prod, selected) {
+    return unitsFor(prod).map(function(c){
+      return '<option value="'+c.code+'"'+(selected==c.code ? ' selected' : '')+'>'+c.name+'</option>';
+    }).join('');
+  }
+  // 換商品：重建單位下拉（面膜→片/盒；包材→袋），包材金額歸 0（可再改）
+  function onProductChange(sel) {
+    var tr = sel.closest('tr');
+    var prod = productById(sel.value);
+    var unitSel = tr.querySelector('select[name="item_combo_code"]');
+    unitSel.innerHTML = unitOptionsHtml(prod, null);
+    if (prod && prod.pkg) { tr.querySelector('input[name="item_amount"]').value = 0; }
+  }
+  // 刪除此行（CR-10）：至少保留一行
+  function removeRow(btn) {
+    var tb = document.getElementById('items-body');
+    if (tb.querySelectorAll('tr').length <= 1) { alert('至少保留一行品項；要取消整張請用「作廢」。'); return; }
+    btn.closest('tr').remove();
+  }
 
   function addRow(item) {
     var tb = document.getElementById('items-body');
     var tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--line)';
     var dis = LOCKED ? ' disabled' : '';
-    var prodOpts = PRODUCTS.map(function(p){return '<option value="'+p.id+'"'+(item && item.product_id==p.id ? ' selected' : '')+'>'+p.name+'</option>';}).join('');
-    var unitOpts = UNITS.map(function(c){return '<option value="'+c.code+'"'+(item && item.combo_code==c.code ? ' selected' : '')+'>'+c.name+'</option>';}).join('');
+    var prod = productById(item ? item.product_id : (PRODUCTS[0] && PRODUCTS[0].id));
+    var prodOpts = PRODUCTS.map(function(p){return '<option value="'+p.id+'"'+(prod && prod.id==p.id ? ' selected' : '')+'>'+p.name+'</option>';}).join('');
+    var unitOpts = unitOptionsHtml(prod, item ? item.combo_code : null);
     var qty = item ? item.qty : 1;
     var amt = item ? item.amount : 0;
     tr.innerHTML =
-      '<td style="padding:6px;"><select name="item_product_id"'+dis+' style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;">'+prodOpts+'</select></td>'+
+      '<td style="padding:6px;"><select name="item_product_id" onchange="onProductChange(this)"'+dis+' style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;">'+prodOpts+'</select></td>'+
       '<td style="padding:6px;"><select name="item_combo_code"'+dis+' style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;">'+unitOpts+'</select></td>'+
       '<td style="padding:6px;"><input name="item_qty" type="number" min="1" value="'+qty+'"'+dis+' style="width:80px;padding:6px;border:1px solid var(--line);border-radius:6px;"></td>'+
       '<td style="padding:6px;"><input name="item_amount" type="number" step="0.01" min="0" value="'+amt+'"'+dis+' style="width:100px;padding:6px;border:1px solid var(--line);border-radius:6px;"></td>'+
-      '<td style="padding:6px;">'+(LOCKED ? '' : '<button type="button" onclick="this.closest(\'tr\').remove()" style="border:none;background:none;color:#a33;cursor:pointer;">移除</button>')+'</td>';
+      '<td style="padding:6px;">'+(LOCKED ? '' : '<button type="button" class="remove-row-btn" onclick="removeRow(this)" style="border:none;background:none;color:#a33;cursor:pointer;">刪除此行</button>')+'</td>';
     tb.appendChild(tr);
   }
   if (INIT_ITEMS.length) { INIT_ITEMS.forEach(function(it){ addRow(it); }); } else { addRow(); }

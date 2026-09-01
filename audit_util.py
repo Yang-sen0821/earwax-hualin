@@ -39,6 +39,8 @@ FIELD_LABELS = {
     "spec_name": "規格名", "spec_value": "規格值", "unit": "單位",
     "qty_on_hand": "數量", "unit_cost": "單位成本",
     "customer_id": "客戶", "customer_name": "客戶",
+    "lines_added": "新增行", "lines_removed": "刪除行", "lines_changed": "修改行",
+    "items_locked": "品項鎖定",
 }
 
 # 值的中文化（依欄位名決定用哪張對照）
@@ -114,6 +116,8 @@ def diff(before, after):
 def _norm(v):
     if isinstance(v, Decimal):
         return float(v)
+    if isinstance(v, str) and _looks_decimal(v):
+        return float(v)   # "800.00" 與 "800" 視為相同（JSON 快照比對用）
     if v == "":
         return None
     return v
@@ -210,12 +214,64 @@ def _before_after(d):
     return parts
 
 
+def _line_text(it):
+    """品項列一句：商品(單位)×數量。"""
+    return (f"{it.get('product_name') or '#' + str(it.get('product_id'))}"
+            f"({combo_label(it.get('combo_code'))})×{it.get('qty')}")
+
+
+def _order_edit_parts(d):
+    """CR-10 order_edit 人話：新增行／刪除行／修改行 + 其餘欄位（收件/運費/折扣/總金額…）只列有變的。"""
+    parts = []
+    added = d.get("lines_added") or []
+    removed = d.get("lines_removed") or []
+    changed = d.get("lines_changed") or []
+    if added:
+        parts.append("新增行：" + "、".join(
+            _line_text(it) + (f" ${_fmt_val('amount', it.get('subtotal'))}"
+                              if it.get("subtotal") not in (None, "") else "")
+            for it in added))
+    if removed:
+        parts.append("刪除行：" + "、".join(_line_text(it) for it in removed))
+    if changed:
+        segs = []
+        for it in changed:
+            seg = (f"{it.get('product_name') or '#' + str(it.get('product_id'))}"
+                   f"({combo_label(it.get('combo_code'))})")
+            qb, qa = it.get("qty_before"), it.get("qty_after")
+            if qb != qa:
+                seg += f" 數量 {qb}→{qa}"
+            sb, sa = it.get("subtotal_before"), it.get("subtotal_after")
+            if _norm(sb) != _norm(sa):
+                seg += f" 金額 {_fmt_val('amount', sb)}→{_fmt_val('amount', sa)}"
+            segs.append(seg)
+        parts.append("修改行：" + "、".join(segs))
+    if d.get("items_locked"):
+        parts.append("有出貨紀錄，品項鎖定")
+    if d.get("via") == "mobile":
+        parts.append("手機")
+    before, after = d.get("before") or {}, d.get("after") or {}
+    if isinstance(before, dict) and isinstance(after, dict):
+        b2 = {k: v for k, v in before.items() if k != "items"}
+        a2 = {k: v for k, v in after.items() if k != "items"}
+        db_, da_ = diff(b2, a2)
+        if db_ or da_:
+            parts.extend(_before_after({"before": db_, "after": da_}))
+        elif not (added or removed or changed) and before.get("items") != after.get("items"):
+            parts.append("品項已重排（數量金額不變）")
+    return parts
+
+
 def summarize(action, detail):
     """action + detail(dict 或 JSON 字串) → 一行人話。任何情況不崩，退回 key: value。"""
     d = detail if isinstance(detail, dict) else parse_detail(detail)
     parts = []
+    generic_ba = True
     try:
-        if action == "order_create":
+        if action == "order_edit":
+            parts.extend(_order_edit_parts(d))
+            generic_ba = False
+        elif action == "order_create":
             items = d.get("items") or []
             names = "、".join(
                 f"{it.get('product_name') or '#' + str(it.get('product_id'))}"
@@ -267,7 +323,7 @@ def summarize(action, detail):
             if d.get("ip"):
                 parts.append(f"IP {d['ip']}")
         # 通用：before/after 逐欄
-        ba = _before_after(d)
+        ba = _before_after(d) if generic_ba else []
         if ba:
             parts.extend(ba)
         if not parts:
