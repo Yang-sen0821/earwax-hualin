@@ -83,7 +83,11 @@ SHIPPING_METHODS = ("711", "post", "pickup", "other")
 @login_required
 def index():
     db = get_session()
-    q = (request.args.get("q") or "").strip()
+    # 2026-09-01 客戶回報 bug：搜「陳筠涵」找不到 FC20260831041——該單收件人空白、
+    # 名字在關聯客戶（customer_id）上，但搜尋只比對 order_no/recipient_*。
+    # 修正：一併比對客戶姓名與客戶電話（outerjoin，未綁客戶的單不受影響）、
+    # 去除前後半形/全形空白、改 ilike 忽略大小寫。
+    q = (request.args.get("q") or "").strip().strip("　").strip()
     pay = (request.args.get("payment_status") or "").strip()
     ship = (request.args.get("shipping_status") or "").strip()
     show_voided = request.args.get("show_voided") == "1"
@@ -93,10 +97,12 @@ def index():
         query = active_orders(query)   # CR-4：預設不列作廢單；勾選後以灰字＋「已作廢」標示
     if q:
         like = f"%{q}%"
-        query = query.filter(
-            (Order.order_no.like(like))
-            | (Order.recipient_name.like(like))
-            | (Order.recipient_phone.like(like))
+        query = query.outerjoin(Customer, Customer.id == Order.customer_id).filter(
+            (Order.order_no.ilike(like))
+            | (Order.recipient_name.ilike(like))
+            | (Order.recipient_phone.ilike(like))
+            | (Customer.name.ilike(like))
+            | (Customer.phone.ilike(like))
         )
     if pay in PAYMENT_STATUSES:
         query = query.filter(Order.payment_status == pay)
